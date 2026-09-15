@@ -1,10 +1,9 @@
-/* Visita Mozambique 2026 — archivos disponibles sin conexión */
+/* Visita Mozambique 2026 — only this project's local assets are cached.
+   Change VERSION whenever HTML, CSS, JS, data or icons change. */
 'use strict';
 
-const VERSION = '2026.09.15.2';
-
+const VERSION = '2026.09.15.3';
 const ROOT = new URL('./', self.location.href).href;
-
 const PREFIX =
   'fvf-visita-moz2026-' +
   encodeURIComponent(ROOT) +
@@ -22,12 +21,14 @@ const FILES = [
   'assets/logo-fundacion-vicente-ferrer.svg'
 ];
 
-const URLS = FILES.map(file => new URL(file, ROOT).href);
+const URLS = FILES.map(
+  file => new URL(file, ROOT).href
+);
+
 const ALLOWED = new Set(URLS);
 
 async function complete() {
   const cache = await caches.open(CACHE);
-
   const checks = await Promise.all(
     URLS.map(url => cache.match(url))
   );
@@ -43,10 +44,11 @@ async function prepare() {
   const cache = await caches.open(CACHE);
 
   await cache.addAll(
-    URLS.map(url =>
-      new Request(url, {
-        cache: 'reload'
-      })
+    URLS.map(
+      url =>
+        new Request(url, {
+          cache: 'reload'
+        })
     )
   );
 
@@ -57,40 +59,44 @@ async function prepare() {
   }
 }
 
-self.addEventListener('install', event => {
-  event.waitUntil(
-    (async () => {
-      await prepare();
-      await self.skipWaiting();
-    })()
-  );
-});
+self.addEventListener(
+  'install',
+  event =>
+    event.waitUntil(
+      (async () => {
+        await prepare();
+        await self.skipWaiting();
+      })()
+    )
+);
 
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    (async () => {
-      if (!(await complete())) {
-        throw new Error(
-          'Copia incompleta: se conserva la versión anterior.'
+self.addEventListener(
+  'activate',
+  event =>
+    event.waitUntil(
+      (async () => {
+        if (!(await complete())) {
+          throw new Error(
+            'Copia incompleta: se conserva la versión anterior.'
+          );
+        }
+
+        const keys = await caches.keys();
+
+        await Promise.all(
+          keys
+            .filter(
+              key =>
+                key.startsWith(PREFIX) &&
+                key !== CACHE
+            )
+            .map(key => caches.delete(key))
         );
-      }
 
-      const keys = await caches.keys();
-
-      await Promise.all(
-        keys
-          .filter(
-            key =>
-              key.startsWith(PREFIX) &&
-              key !== CACHE
-          )
-          .map(key => caches.delete(key))
-      );
-
-      await self.clients.claim();
-    })()
-  );
-});
+        await self.clients.claim();
+      })()
+    )
+);
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
@@ -98,19 +104,15 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   const root = new URL(ROOT);
 
-  if (url.origin !== root.origin) {
-    return;
-  }
+  if (url.origin !== root.origin) return;
 
   const canonical =
     url.origin + url.pathname;
 
   const isRoot =
     canonical === ROOT ||
-    canonical === new URL(
-      'index.html',
-      ROOT
-    ).href;
+    canonical ===
+      new URL('index.html', ROOT).href;
 
   if (
     event.request.mode === 'navigate' &&
@@ -119,7 +121,6 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       (async () => {
         const cache = await caches.open(CACHE);
-
         const saved = await cache.match(
           new URL('index.html', ROOT).href
         );
@@ -175,8 +176,7 @@ self.addEventListener('message', event => {
         port.postMessage({
           ok: false,
           error:
-            'No se pudo guardar la guía completa. ' +
-            'Comprueba la conexión y vuelve a intentarlo.'
+            'No se pudo guardar la guía completa. Comprueba la conexión y vuelve a intentarlo.'
         });
       }
     })()
