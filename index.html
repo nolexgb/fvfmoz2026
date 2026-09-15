@@ -1,573 +1,318 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover"
-  >
-
-  <meta name="theme-color" content="#eb5b25">
-
-  <meta
-    name="description"
-    content="Itinerario interactivo de Fundación Vicente Ferrer en Mozambique, del 21 al 27 de septiembre de 2026. Agenda y distancias disponibles sin conexión."
-  >
-
-  <title>Visita Mozambique 2026 · Fundación Vicente Ferrer</title>
-
-  <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="style.css">
-
-  <style>
-    .site-header .fvf-logo {
-      display: block;
-      width: 190px;
-      max-width: 100%;
-      height: auto;
-    }
-
-    @media (max-width: 1150px) {
-      .site-header .fvf-logo {
-        width: 150px;
-      }
-    }
-
-    @media (max-width: 820px) {
-      :root {
-        --header: 130px;
-      }
-
-      .site-header {
-        display: grid;
-        grid-template-columns: 112px minmax(0, 1fr);
-        column-gap: 12px;
-        row-gap: 8px;
-      }
-
-      .site-header .fvf-logo {
-        width: 112px;
-      }
-
-      .site-header .trip-heading {
-        min-width: 0;
-      }
-
-      .site-header .header-tools {
-        grid-column: 1 / -1;
-        width: 100%;
-      }
-    }
-  </style>
-
-  <script src="data.js" defer></script>
-  <script src="app.js" defer></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#eb5b25">
+<meta name="description" content="Itinerario interactivo de Fundación Vicente Ferrer en Mozambique, del 21 al 27 de septiembre de 2026. Agenda y distancias disponibles sin conexión.">
+<title>Visita Mozambique 2026 · Fundación Vicente Ferrer</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+<script src="data.js" defer></script>
+<script src="app.js" defer></script>
 </head>
 
 <body data-mobile-view="map">
 
-  <a class="skip-link" href="#agenda-content">
-    Saltar al itinerario
-  </a>
+<a class="skip-link" href="#agenda-content">Saltar al itinerario</a>
 
-  <header class="site-header">
+<header class="site-header">
+  <div class="brand">
+    <img
+      class="brand-logo"
+      src="assets/logo-fundacion-vicente-ferrer.svg"
+      alt="Fundación Vicente Ferrer"
+      width="640"
+      height="185"
+      decoding="async"
+      fetchpriority="high">
+  </div>
 
-    <div class="brand">
-      <img
-        class="fvf-logo"
-        src="https://www.fundacionvicenteferrer.org/themes/fvf/assets/images/logo-fundacion-vicente-ferrer.svg"
-        alt="Fundación Vicente Ferrer"
-        width="640"
-        height="185"
-        decoding="async"
-        fetchpriority="high"
-      >
-    </div>
+  <div class="trip-heading">
+    <h1>Visita Mozambique <span>2026</span></h1>
+    <p>21—27 septiembre <span aria-hidden="true">/</span> Maputo · Gaza</p>
+  </div>
 
-    <div class="trip-heading">
-      <h1>Visita Mozambique <span>2026</span></h1>
+  <div class="header-tools">
+    <button class="button button-primary" id="offline-button" type="button">
+      <span data-icon="download"></span>
+      <span id="offline-button-label">Guardar sin conexión</span>
+    </button>
+  </div>
+</header>
 
-      <p>
-        21—27 septiembre
-        <span aria-hidden="true">/</span>
-        Maputo · Gaza
-      </p>
-    </div>
+<nav class="day-nav" aria-label="Seleccionar día del viaje">
+  <div class="day-tabs" id="day-tabs"></div>
+</nav>
 
-    <div class="header-tools">
-      <span
-        class="connection"
-        id="connection-status"
-        role="status"
-      >
-        Comprobando conexión
-      </span>
+<nav class="mobile-nav" aria-label="Vista en el móvil">
+  <button type="button" data-mobile="map" aria-pressed="true">
+    <span data-icon="map"></span>Mapa
+  </button>
+
+  <button type="button" data-mobile="agenda" aria-pressed="false">
+    <span data-icon="calendar"></span>Agenda
+  </button>
+
+  <button type="button" data-mobile="distances" aria-pressed="false">
+    <span data-icon="route"></span>Distancias
+  </button>
+</nav>
+
+<main class="workspace">
+
+  <aside class="sidebar" aria-label="Información de la visita">
+
+    <div class="panel-tabs" role="tablist" aria-label="Información">
+      <button
+        type="button"
+        role="tab"
+        aria-selected="true"
+        aria-controls="agenda-panel"
+        id="tab-agenda"
+        data-panel="agenda">
+        Agenda
+      </button>
 
       <button
-        class="button button-primary"
-        id="offline-button"
         type="button"
-      >
-        <span data-icon="download"></span>
+        role="tab"
+        aria-selected="false"
+        aria-controls="distances-panel"
+        id="tab-distances"
+        data-panel="distances"
+        tabindex="-1">
+        Distancias
+      </button>
 
-        <span id="offline-button-label">
-          Guardar sin conexión
-        </span>
+      <button
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="places-panel"
+        id="tab-places"
+        data-panel="places"
+        tabindex="-1">
+        Lugares
       </button>
     </div>
-
-  </header>
-
-  <nav
-    class="day-nav"
-    aria-label="Seleccionar día del viaje"
-  >
-    <div class="day-tabs" id="day-tabs"></div>
-  </nav>
-
-  <nav
-    class="mobile-nav"
-    aria-label="Vista en el móvil"
-  >
-    <button
-      type="button"
-      data-mobile="map"
-      aria-pressed="true"
-    >
-      <span data-icon="map"></span>
-      Mapa
-    </button>
-
-    <button
-      type="button"
-      data-mobile="agenda"
-      aria-pressed="false"
-    >
-      <span data-icon="calendar"></span>
-      Agenda
-    </button>
-
-    <button
-      type="button"
-      data-mobile="distances"
-      aria-pressed="false"
-    >
-      <span data-icon="route"></span>
-      Distancias
-    </button>
-  </nav>
-
-  <main class="workspace">
-
-    <aside
-      class="sidebar"
-      aria-label="Información de la visita"
-    >
-
-      <div
-        class="panel-tabs"
-        role="tablist"
-        aria-label="Información"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected="true"
-          aria-controls="agenda-panel"
-          id="tab-agenda"
-          data-panel="agenda"
-        >
-          Agenda
-        </button>
-
-        <button
-          type="button"
-          role="tab"
-          aria-selected="false"
-          aria-controls="distances-panel"
-          id="tab-distances"
-          data-panel="distances"
-          tabindex="-1"
-        >
-          Distancias
-        </button>
-
-        <button
-          type="button"
-          role="tab"
-          aria-selected="false"
-          aria-controls="places-panel"
-          id="tab-places"
-          data-panel="places"
-          tabindex="-1"
-        >
-          Lugares
-        </button>
-      </div>
-
-      <section
-        class="panel"
-        id="agenda-panel"
-        role="tabpanel"
-        aria-labelledby="tab-agenda"
-      >
-        <div
-          id="agenda-content"
-          tabindex="-1"
-        ></div>
-      </section>
-
-      <section
-        class="panel"
-        id="distances-panel"
-        role="tabpanel"
-        aria-labelledby="tab-distances"
-        hidden
-      >
-        <div class="section-heading">
-          <p class="eyebrow">
-            CONSULTA SIN CONEXIÓN
-          </p>
-
-          <h2>Distancias del viaje</h2>
-
-          <p>
-            Los kilómetros están guardados en esta guía.
-          </p>
-        </div>
-
-        <form
-          id="distance-form"
-          class="distance-form"
-        >
-          <label for="distance-from">
-            Origen
-          </label>
-
-          <select
-            id="distance-from"
-            name="from"
-          ></select>
-
-          <button
-            type="button"
-            class="swap-button"
-            id="swap-places"
-            aria-label="Intercambiar origen y destino"
-          >
-            <span data-icon="swap"></span>
-          </button>
-
-          <label for="distance-to">
-            Destino
-          </label>
-
-          <select
-            id="distance-to"
-            name="to"
-          ></select>
-
-          <button
-            type="submit"
-            class="button button-dark"
-          >
-            <span data-icon="route"></span>
-            Consultar distancia
-          </button>
-        </form>
-
-        <div
-          id="distance-result"
-          class="distance-result"
-          aria-live="polite"
-        ></div>
-
-        <div class="section-heading compact">
-          <h3>Trayectos del itinerario</h3>
-
-          <p>
-            Selecciona un tramo para verlo en el mapa.
-          </p>
-        </div>
-
-        <div id="distance-list"></div>
-
-        <details class="info-details">
-          <summary>
-            Cómo interpretar los kilómetros
-          </summary>
-
-          <p>
-            Las distancias por carretera son orientativas.
-          </p>
-        </details>
-
-      </section>
-
-      <section
-        class="panel"
-        id="places-panel"
-        role="tabpanel"
-        aria-labelledby="tab-places"
-        hidden
-      >
-        <div class="section-heading">
-          <p class="eyebrow">
-            PUNTOS DE LA VISITA
-          </p>
-
-          <h2>Lugares y alojamientos</h2>
-
-          <p>
-            Enlaces, reservas y ubicaciones.
-          </p>
-        </div>
-
-        <div id="places-list"></div>
-      </section>
-
-      <div class="sidebar-footer">
-        <button
-          class="text-button"
-          id="print-button"
-          type="button"
-        >
-          <span data-icon="print"></span>
-          Imprimir itinerario
-        </button>
-
-        <button
-          class="text-button"
-          id="help-button"
-          type="button"
-        >
-          Uso sin conexión
-        </button>
-      </div>
-
-    </aside>
 
     <section
-      class="map-section"
-      aria-label="Mapa interactivo del itinerario"
-    >
-
-      <div
-        id="map"
-        aria-label="Mapa de la visita a Mozambique"
-      ></div>
-
-      <div class="map-topbar">
-
-        <div class="map-caption">
-          <span
-            class="eyebrow"
-            id="map-eyebrow"
-          >
-            RECORRIDO COMPLETO
-          </span>
-
-          <h2 id="map-title">
-            Maputo · Chókwè · Mapai
-          </h2>
-        </div>
-
-        <button
-          class="map-control"
-          id="fit-map"
-          type="button"
-          title="Centrar el recorrido"
-          aria-label="Centrar el recorrido"
-        >
-          <span data-icon="focus"></span>
-        </button>
-
-      </div>
-
-      <div class="map-actions">
-
-        <button
-          class="map-control"
-          id="zoom-in"
-          type="button"
-          aria-label="Acercar mapa"
-        >
-          +
-        </button>
-
-        <button
-          class="map-control"
-          id="zoom-out"
-          type="button"
-          aria-label="Alejar mapa"
-        >
-          −
-        </button>
-
-        <button
-          class="map-control"
-          id="locate-button"
-          type="button"
-          aria-label="Mostrar mi ubicación"
-          title="Mi ubicación"
-        >
-          <span data-icon="locate"></span>
-        </button>
-
-      </div>
-
-      <div
-        class="basemap-switch"
-        aria-label="Fondo del mapa"
-      >
-        <button
-          type="button"
-          id="base-offline"
-          aria-pressed="true"
-        >
-          Mapa guardado
-        </button>
-
-        <button
-          type="button"
-          id="base-streets"
-          aria-pressed="false"
-        >
-          Calles · internet
-        </button>
-      </div>
-
-      <div class="map-bottom">
-
-        <div class="map-key">
-          <span class="key-line"></span>
-          Trayectos guardados
-
-          <span class="key-pending"></span>
-          Punto aproximado
-        </div>
-
-        <div class="journey-control">
-          <button
-            class="button button-dark"
-            id="play-journey"
-            type="button"
-            aria-pressed="false"
-          >
-            <span data-icon="play"></span>
-            <span>Recorrer días</span>
-          </button>
-
-          <span
-            id="map-status"
-            role="status"
-          >
-            Mapa básico disponible sin conexión
-          </span>
-        </div>
-
-      </div>
-
-      <div
-        class="mobile-map-summary"
-        id="mobile-map-summary"
-      ></div>
-
+      class="panel"
+      id="agenda-panel"
+      role="tabpanel"
+      aria-labelledby="tab-agenda">
+      <div id="agenda-content" tabindex="-1"></div>
     </section>
 
-  </main>
+    <section
+      class="panel"
+      id="distances-panel"
+      role="tabpanel"
+      aria-labelledby="tab-distances"
+      hidden>
 
-  <dialog
-    id="offline-dialog"
-    aria-labelledby="offline-dialog-title"
-  >
+      <div class="section-heading">
+        <p class="eyebrow">CONSULTA SIN CONEXIÓN</p>
+        <h2>Distancias del viaje</h2>
+        <p>Los kilómetros están guardados en esta guía.</p>
+      </div>
 
-    <div class="dialog-heading">
-      <h2 id="offline-dialog-title">
-        Tu guía, también sin internet
-      </h2>
+      <form id="distance-form" class="distance-form">
+        <label for="distance-from">Origen</label>
+        <select id="distance-from" name="from"></select>
 
-      <button
-        type="button"
-        class="map-control"
-        id="close-dialog"
-        aria-label="Cerrar"
-      >
-        <span data-icon="close"></span>
+        <button
+          type="button"
+          class="swap-button"
+          id="swap-places"
+          aria-label="Intercambiar origen y destino">
+          <span data-icon="swap"></span>
+        </button>
+
+        <label for="distance-to">Destino</label>
+        <select id="distance-to" name="to"></select>
+
+        <button type="submit" class="button button-dark">
+          <span data-icon="route"></span>
+          Consultar distancia
+        </button>
+      </form>
+
+      <div id="distance-result" class="distance-result" aria-live="polite"></div>
+
+      <div class="section-heading compact">
+        <h3>Trayectos del itinerario</h3>
+        <p>Selecciona un tramo para verlo en el mapa.</p>
+      </div>
+
+      <div id="distance-list"></div>
+
+      <details class="info-details">
+        <summary>Cómo interpretar los kilómetros</summary>
+        <p>
+          Las distancias por carretera son orientativas y dependerán del estado
+          de las carreteras.
+        </p>
+      </details>
+    </section>
+
+    <section
+      class="panel"
+      id="places-panel"
+      role="tabpanel"
+      aria-labelledby="tab-places"
+      hidden>
+
+      <div class="section-heading">
+        <p class="eyebrow">PUNTOS DE LA VISITA</p>
+        <h2>Lugares y alojamientos</h2>
+        <p>Enlaces, reservas y ubicaciones.</p>
+      </div>
+
+      <div id="places-list"></div>
+    </section>
+
+    <div class="sidebar-footer">
+      <button class="text-button" id="print-button" type="button">
+        <span data-icon="print"></span>
+        Imprimir itinerario
+      </button>
+
+      <button class="text-button" id="help-button" type="button">
+        Uso sin conexión
       </button>
     </div>
 
-    <p>
-      Con conexión, pulsa
-      <strong>Guardar sin conexión</strong>
-      y espera a que aparezca
-      «Disponible sin conexión».
-    </p>
+  </aside>
 
-    <ol>
-      <li>
-        Abre esta web en el navegador habitual
-        de tu móvil.
-      </li>
+  <section class="map-section" aria-label="Mapa interactivo del itinerario">
 
-      <li>
-        Guárdala antes del viaje. Puedes añadirla
-        a la pantalla de inicio desde el menú
-        del navegador.
-      </li>
+    <div id="map" aria-label="Mapa de la visita a Mozambique"></div>
 
-      <li>
-        Activa el modo avión y vuelve a abrir
-        la web para comprobar que está preparada.
-      </li>
-    </ol>
+    <div class="map-topbar">
+      <div class="map-caption">
+        <span class="eyebrow" id="map-eyebrow">RECORRIDO COMPLETO</span>
+        <h2 id="map-title">Maputo · Chókwè · Mapai</h2>
+      </div>
 
-    <p>
-      Se guardan la agenda, las distancias,
-      los puntos y el mapa básico. La vista
-      de calles y Google Maps necesitan internet.
-      El mapa guardado permite situar los trayectos;
-      no ofrece navegación giro a giro.
-    </p>
-
-    <p class="small-note">
-      La copia se guarda en este dispositivo
-      y navegador. Borrar sus datos elimina
-      la copia. Abrir los archivos descargados
-      permite consultar sus datos; el guardado
-      de la web requiere HTTPS, como el que
-      ofrece GitHub Pages.
-    </p>
-
-    <div
-      id="offline-detail"
-      role="status"
-    ></div>
-
-  </dialog>
-
-  <div
-    class="toast"
-    id="toast"
-    role="status"
-    hidden
-  ></div>
-
-  <section
-    class="print-only"
-    id="print-itinerary"
-    aria-label="Itinerario para imprimir"
-  ></section>
-
-  <noscript>
-    <div class="noscript">
-      Activa JavaScript para usar el mapa
-      y consultar los días. El itinerario
-      completo está en el archivo README.md.
+      <button
+        class="map-control"
+        id="fit-map"
+        type="button"
+        title="Centrar el recorrido"
+        aria-label="Centrar el recorrido">
+        <span data-icon="focus"></span>
+      </button>
     </div>
-  </noscript>
+
+    <div class="map-actions">
+      <button class="map-control" id="zoom-in" type="button" aria-label="Acercar mapa">
+        +
+      </button>
+
+      <button class="map-control" id="zoom-out" type="button" aria-label="Alejar mapa">
+        −
+      </button>
+
+      <button
+        class="map-control"
+        id="locate-button"
+        type="button"
+        aria-label="Mostrar mi ubicación"
+        title="Mi ubicación">
+        <span data-icon="locate"></span>
+      </button>
+    </div>
+
+    <div class="basemap-switch" aria-label="Fondo del mapa">
+      <button type="button" id="base-offline" aria-pressed="true">
+        Mapa guardado
+      </button>
+    </div>
+
+    <div class="map-bottom">
+      <div class="map-key">
+        <span class="key-line"></span>
+        Trayectos guardados
+        <span class="key-pending"></span>
+        Punto aproximado
+      </div>
+
+      <div class="journey-control">
+        <button
+          class="button button-dark"
+          id="play-journey"
+          type="button"
+          aria-pressed="false">
+          <span data-icon="play"></span>
+          <span>Recorrer días</span>
+        </button>
+
+        <span id="map-status" role="status">
+          Mapa básico disponible sin conexión
+        </span>
+      </div>
+    </div>
+
+    <div class="mobile-map-summary" id="mobile-map-summary"></div>
+  </section>
+</main>
+
+<dialog id="offline-dialog" aria-labelledby="offline-dialog-title">
+  <div class="dialog-heading">
+    <h2 id="offline-dialog-title">Tu guía, también sin internet</h2>
+
+    <button
+      type="button"
+      class="map-control"
+      id="close-dialog"
+      aria-label="Cerrar">
+      <span data-icon="close"></span>
+    </button>
+  </div>
+
+  <p>
+    Con conexión, pulsa <strong>Guardar sin conexión</strong> y espera a que
+    aparezca «Disponible sin conexión».
+  </p>
+
+  <ol>
+    <li>Abre esta web en el navegador habitual de tu móvil.</li>
+    <li>Guárdala antes del viaje. Puedes añadirla a la pantalla de inicio desde el menú del navegador.</li>
+    <li>Activa el modo avión y vuelve a abrir la web para comprobar que está preparada.</li>
+  </ol>
+
+  <p>
+    Se guardan la agenda, las distancias, los puntos y el mapa básico.
+    Los enlaces de Google Maps necesitan internet.
+    El mapa guardado permite situar los trayectos; no ofrece navegación giro a giro.
+  </p>
+
+  <p class="small-note">
+    La copia se guarda en este dispositivo y navegador. Borrar sus datos elimina
+    la copia. Abrir los archivos descargados permite consultar sus datos; el
+    guardado de la web requiere HTTPS, como el que ofrece GitHub Pages.
+  </p>
+
+  <div id="offline-detail" role="status"></div>
+</dialog>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<section
+  class="print-only"
+  id="print-itinerary"
+  aria-label="Itinerario para imprimir">
+</section>
+
+<noscript>
+  <div class="noscript">
+    Activa JavaScript para usar el mapa y consultar los días.
+    El itinerario completo está en el archivo README.md.
+  </div>
+</noscript>
 
 </body>
 </html>
