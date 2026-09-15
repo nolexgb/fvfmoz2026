@@ -22,7 +22,6 @@
   <link rel="stylesheet" href="style.css">
 
   <style>
-    /* Logotipo oficial. Compatible con el style.css del paquete. */
     .site-header .fvf-logo {
       display: block;
       width: 190px;
@@ -73,7 +72,6 @@
     Saltar al itinerario
   </a>
 
- 
   <header class="site-header">
 
     <div class="brand">
@@ -122,7 +120,6 @@
 
   </header>
 
-
   <nav
     class="day-nav"
     aria-label="Seleccionar día del viaje"
@@ -130,10 +127,9 @@
     <div class="day-tabs" id="day-tabs"></div>
   </nav>
 
-
   <nav
     class="mobile-nav"
-    aria aria-label="Vista en el móvil"
+    aria-label="Vista en el móvil"
   >
     <button
       type="button"
@@ -163,10 +159,8 @@
     </button>
   </nav>
 
-  <!-- CONTENIDO PRINCIPAL -->
   <main class="workspace">
 
-    <!-- PANEL LATERAL -->
     <aside
       class="sidebar"
       aria-label="Información de la visita"
@@ -213,17 +207,18 @@
         </button>
       </div>
 
-      <!-- AGENDA -->
       <section
         class="panel"
         id="agenda-panel"
         role="tabpanel"
         aria-labelledby="tab-agenda"
       >
-        <div id="agenda-content" tabindex="-1"></div>
+        <div
+          id="agenda-content"
+          tabindex="-1"
+        ></div>
       </section>
 
-      <!-- DISTANCIAS -->
       <section
         class="panel"
         id="distances-panel"
@@ -232,7 +227,9 @@
         hidden
       >
         <div class="section-heading">
-          <p class="eyebrow">CONSULTA SIN CONEXIÓN</p>
+          <p class="eyebrow">
+            CONSULTA SIN CONEXIÓN
+          </p>
 
           <h2>Distancias del viaje</h2>
 
@@ -241,9 +238,13 @@
           </p>
         </div>
 
-        <form id="distance-form" class="distance-form">
-
-          <label for="distance-from">Origen</label>
+        <form
+          id="distance-form"
+          class="distance-form"
+        >
+          <label for="distance-from">
+            Origen
+          </label>
 
           <select
             id="distance-from"
@@ -259,7 +260,9 @@
             <span data-icon="swap"></span>
           </button>
 
-          <label for="distance-to">Destino</label>
+          <label for="distance-to">
+            Destino
+          </label>
 
           <select
             id="distance-to"
@@ -273,7 +276,6 @@
             <span data-icon="route"></span>
             Consultar distancia
           </button>
-
         </form>
 
         <div
@@ -299,11 +301,11 @@
 
           <p>
             Las distancias por carretera son orientativas.
-          
+          </p>
+        </details>
 
       </section>
 
-   
       <section
         class="panel"
         id="places-panel"
@@ -312,17 +314,21 @@
         hidden
       >
         <div class="section-heading">
-          <p class="eyebrow">PUNTOS DE LA VISITA</p>
+          <p class="eyebrow">
+            PUNTOS DE LA VISITA
+          </p>
 
           <h2>Lugares y alojamientos</h2>
 
-          <p>Enlaces, reservas y ubicaciones.</p>
+          <p>
+            Enlaces, reservas y ubicaciones.
+          </p>
         </div>
 
         <div id="places-list"></div>
       </section>
 
-           <div class="sidebar-footer">
+      <div class="sidebar-footer">
         <button
           class="text-button"
           id="print-button"
@@ -343,7 +349,7 @@
 
     </aside>
 
-      <section
+    <section
       class="map-section"
       aria-label="Mapa interactivo del itinerario"
     >
@@ -353,7 +359,7 @@
         aria-label="Mapa de la visita a Mozambique"
       ></div>
 
-           <div class="map-topbar">
+      <div class="map-topbar">
 
         <div class="map-caption">
           <span
@@ -380,7 +386,6 @@
 
       </div>
 
-      <!-- ZOOM Y UBICACIÓN -->
       <div class="map-actions">
 
         <button
@@ -413,7 +418,6 @@
 
       </div>
 
-
       <div
         class="basemap-switch"
         aria-label="Fondo del mapa"
@@ -435,7 +439,6 @@
         </button>
       </div>
 
- 
       <div class="map-bottom">
 
         <div class="map-key">
@@ -457,7 +460,10 @@
             <span>Recorrer días</span>
           </button>
 
-          <span id="map-status" role="status">
+          <span
+            id="map-status"
+            role="status"
+          >
             Mapa básico disponible sin conexión
           </span>
         </div>
@@ -473,7 +479,6 @@
 
   </main>
 
-  <!-- AYUDA PARA USO SIN CONEXIÓN -->
   <dialog
     id="offline-dialog"
     aria-labelledby="offline-dialog-title"
@@ -495,44 +500,53 @@
     </div>
 
     <p>
-      Con conexión, pulsa <strong>Guardar sin conexión</strong>
-      y espera a que aparezca «Disponible sin conexión».
+      Con conexión, pulsa
+      <strong>Guardar sin conexión</strong>
+      y espera a que aparezca
+      «Disponible sin conexión».
     </p>
 
     <ol>
       <li>
-        Abre esta web en el navegador habitual de tu móvil.
+        Abre esta web en el navegador habitual
+        de tu móvil.
       </li>
 
       <li>
-        Guárdala antes del viaje. Puedes añadirla a la
-        pantalla de inicio desde el menú del navegador.
+        Guárdala antes del viaje. Puedes añadirla
+        a la pantalla de inicio desde el menú
+        del navegador.
       </li>
 
       <li>
-        Activa el modo avión y vuelve a abrir la web
-        para comprobar que está preparada.
+        Activa el modo avión y vuelve a abrir
+        la web para comprobar que está preparada.
       </li>
     </ol>
 
     <p>
-      Se guardan la agenda, las distancias, los puntos y
-      el mapa básico. La vista de calles y Google Maps
-      necesitan internet. El mapa guardado permite
-      situar los trayectos; no ofrece navegación giro a giro.
+      Se guardan la agenda, las distancias,
+      los puntos y el mapa básico. La vista
+      de calles y Google Maps necesitan internet.
+      El mapa guardado permite situar los trayectos;
+      no ofrece navegación giro a giro.
     </p>
 
     <p class="small-note">
-      La copia se guarda en este dispositivo y navegador.
-      Borrar sus datos elimina la copia. Abrir los archivos
-      descargados permite consultar sus datos; el guardado
-      de la web requiere HTTPS, como el que ofrece GitHub Pages.
+      La copia se guarda en este dispositivo
+      y navegador. Borrar sus datos elimina
+      la copia. Abrir los archivos descargados
+      permite consultar sus datos; el guardado
+      de la web requiere HTTPS, como el que
+      ofrece GitHub Pages.
     </p>
 
-    <div id="offline-detail" role="status"></div>
+    <div
+      id="offline-detail"
+      role="status"
+    ></div>
 
   </dialog>
-
 
   <div
     class="toast"
@@ -549,12 +563,11 @@
 
   <noscript>
     <div class="noscript">
-      Activa JavaScript para usar el mapa y consultar
-      los días. El itinerario completo está en el
-      archivo README.md.
+      Activa JavaScript para usar el mapa
+      y consultar los días. El itinerario
+      completo está en el archivo README.md.
     </div>
   </noscript>
 
 </body>
-</html> 
 </html>
