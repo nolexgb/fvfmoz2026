@@ -1,0 +1,13 @@
+{
+  "id": "./",
+  "name": "Visita Mozambique 2026 · Fundación Vicente Ferrer",
+  "short_name": "Visita MOZ 2026",
+  "description": "Agenda, mapa y distancias de la visita de Fundación Vicente Ferrer a Mozambique.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f7f9",
+  "theme_color": "#eb5b25",
+  "icons": [{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}]
+}
