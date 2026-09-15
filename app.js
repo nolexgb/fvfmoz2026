@@ -38,365 +38,1937 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /* VISIT APPLICATION START — no external code is fetched at runtime. */
 (function () {
   'use strict';
+
   const D = window.VISIT_DATA;
   if (!D) return;
+
   const routesById = Object.fromEntries(D.routes.map(r => [r.id, r]));
   const places = D.places;
-  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const number = n => new Intl.NumberFormat('es-ES', {maximumFractionDigits: 1}).format(n);
-  const kmText = n => n == null ? 'Pendiente' : number(n) + ' km';
+
+  const esc = value =>
+    String(value ?? '').replace(
+      /[&<>"']/g,
+      c => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[c])
+    );
+
+  const number = n =>
+    new Intl.NumberFormat('es-ES', {
+      maximumFractionDigits: 1
+    }).format(n);
+
+  const kmText = n =>
+    n == null ? 'Pendiente' : number(n) + ' km';
+
   function distanceBetween(from, to) {
     if (!places[from] || !places[to]) return null;
-    if (from === to) return {km:0, path:[], nodes:[from], reverse:false};
-    const distances = {[from]:0}, previous = {}, seen = new Set();
+
+    if (from === to) {
+      return {
+        km: 0,
+        path: [],
+        nodes: [from],
+        reverse: false
+      };
+    }
+
+    const distances = { [from]: 0 };
+    const previous = {};
+    const seen = new Set();
+
     while (true) {
-      const node = Object.keys(distances).filter(k => !seen.has(k)).sort((a,b) => distances[a]-distances[b])[0];
+      const node = Object.keys(distances)
+        .filter(k => !seen.has(k))
+        .sort((a, b) => distances[a] - distances[b])[0];
+
       if (!node) return null;
       if (node === to) break;
+
       seen.add(node);
+
       for (const r of D.routes) {
         if (!Number.isFinite(r.km) || r.km < 0) continue;
-        const next = r.from === node ? r.to : r.to === node ? r.from : null;
+
+        const next =
+          r.from === node
+            ? r.to
+            : r.to === node
+              ? r.from
+              : null;
+
         if (!next) continue;
+
         const value = distances[node] + r.km;
-        if (distances[next] === undefined || value < distances[next]) {
-          distances[next] = value; previous[next] = {node, id:r.id, reverse:r.to===node};
+
+        if (
+          distances[next] === undefined ||
+          value < distances[next]
+        ) {
+          distances[next] = value;
+          previous[next] = {
+            node,
+            id: r.id,
+            reverse: r.to === node
+          };
         }
       }
     }
-    const path = [], nodes = [to];
+
+    const path = [];
+    const nodes = [to];
     let cursor = to;
-    while (cursor !== from) { const p = previous[cursor]; path.unshift({id:p.id, reverse:p.reverse}); cursor=p.node; nodes.unshift(cursor); }
-    return {km:Math.round(distances[to]*10)/10, path, nodes, reverse:path.some(p=>p.reverse)};
+
+    while (cursor !== from) {
+      const p = previous[cursor];
+
+      path.unshift({
+        id: p.id,
+        reverse: p.reverse
+      });
+
+      cursor = p.node;
+      nodes.unshift(cursor);
+    }
+
+    return {
+      km: Math.round(distances[to] * 10) / 10,
+      path,
+      nodes,
+      reverse: path.some(p => p.reverse)
+    };
   }
+
   function summaryForDay(day) {
-    const list = day.legs.map(id=>routesById[id]);
-    const known = list.filter(r=>Number.isFinite(r.km));
-    return {km:known.length ? Math.round(known.reduce((a,r)=>a+r.km,0)*10)/10 : null, partial:known.length<list.length};
+    const list = day.legs.map(id => routesById[id]);
+    const known = list.filter(r => Number.isFinite(r.km));
+
+    return {
+      km: known.length
+        ? Math.round(
+            known.reduce((a, r) => a + r.km, 0) * 10
+          ) / 10
+        : null,
+      partial: known.length < list.length
+    };
   }
-  function dayFromHash(hash) { const match=/^#dia-(2[1-7])$/.exec(hash || ''); return match ? Number(match[1]) : 'all'; }
-  window.VisitUtils = {distanceBetween, summaryForDay, dayFromHash};
-  if (!document.getElementById('map')) return;
-  const $ = id => document.getElementById(id);
-  const svgPaths = {
-    map:'<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Z"/><path d="M9 3v15m6-12v15"/>',
-    calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18m-13 4h3m2 0h3m-8 3h3"/>',
-    route:'<circle cx="5" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 6h9a4 4 0 0 1 0 8H8a4 4 0 0 0 0 8h5"/>',
-    download:'<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',
-    focus:'<path d="M3 8V3h5m8 0h5v5m0 8v5h-5M8 21H3v-5"/><circle cx="12" cy="12" r="3"/>',
-    locate:'<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/>',
-    airport:'<path d="m22 2-8 20-4-8-8-4Z"/><path d="m22 2-12 12"/>',
-    health:'<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6Z"/>',
-    hotel:'<path d="M3 18v-8m0 5h18v-5H8v5m13-5v8M3 18v3m18-3v3"/><path d="M4 6h4v4H4z"/>',
-    city:'<path d="M3 21V9h7v12m0-17h10v17M1 21h22M6 12h1m-1 4h1m7-9h2m-2 4h2m-2 4h2"/>',
-    community:'<circle cx="9" cy="7" r="3"/><path d="M3 21v-4a6 6 0 0 1 12 0v4M17 4a3 3 0 0 1 0 6m2 11v-4a6 6 0 0 0-2-4"/>',
-    embassy:'<path d="m3 8 9-5 9 5H3Zm0 13h18M5 8v10m7-10v10m7-10v10M3 18h18"/>',
-    play:'<path d="m8 4 12 8-12 8Z"/>',
-    pause:'<path d="M8 4v16M16 4v16"/>',
-    close:'<path d="m6 6 12 12M6 18 18 6"/>',
-    swap:'<path d="M8 3v18m-4-4 4 4 4-4M16 21V3m-4 4 4-4 4 4"/>',
-    print:'<path d="M7 8V3h10v5M7 17H3V9h18v8h-4M7 14h10v7H7Z"/><path d="M17 11h1"/>',
-    pin:'<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
-    external:'<path d="M14 3h7v7m0-7L10 14M10 3H3v18h18v-7"/>',
-    check:'<path d="m4 12 5 5L20 6"/>'
+
+  function dayFromHash(hash) {
+    const match = /^#dia-(2[1-7])$/.exec(hash || '');
+    return match ? Number(match[1]) : 'all';
+  }
+
+  window.VisitUtils = {
+    distanceBetween,
+    summaryForDay,
+    dayFromHash
   };
-  const icon = name => '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(svgPaths[name] || svgPaths.pin)+'</svg>';
-  document.querySelectorAll('[data-icon]').forEach(e=>e.innerHTML=icon(e.dataset.icon));
-  let currentDay = dayFromHash(location.hash), currentPanel = 'agenda', autoplay = null, toastTimer;
-  let map, backgroundRoutes, activeRoutes, markerLayer, labelLayer, tileLayer = null, positionLayer;
-  let baseMode = 'offline', routeHighlight = null, distanceSelection = null;
-  const smallScreen = () => matchMedia('(max-width: 820px)').matches;
-  const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-  function toast(message) { $('toast').textContent=message; $('toast').hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('toast').hidden=true,6500); }
-  function statusLabel(p) {return p.precision==='pending' ? 'Ubicación pendiente' : p.precision==='area' ? 'Referencia de la localidad' : 'Ubicación del enlace';}
-  function mapsLink(p) {
-    if (p.maps) return p.maps;
-    return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(p.name+', Mozambique');
+
+  if (!document.getElementById('map')) return;
+
+  const $ = id => document.getElementById(id);
+
+  const svgPaths = {
+    map: '<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Z"/><path d="M9 3v15m6-12v15"/>',
+
+    calendar:
+      '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18m-13 4h3m2 0h3m-8 3h3"/>',
+
+    route:
+      '<circle cx="5" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 6h9a4 4 0 0 1 0 8H8a4 4 0 0 0 0 8h5"/>',
+
+    download:
+      '<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',
+
+    focus:
+      '<path d="M3 8V3h5m8 0h5v5m0 8v5h-5M8 21H3v-5"/><circle cx="12" cy="12" r="3"/>',
+
+    locate:
+      '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/>',
+
+    airport:
+      '<path d="m22 2-8 20-4-8-8-4Z"/><path d="m22 2-12 12"/>',
+
+    health:
+      '<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6Z"/>',
+
+    hotel:
+      '<path d="M3 18v-8m0 5h18v-5H8v5m13-5v8M3 18v3m18-3v3"/><path d="M4 6h4v4H4z"/>',
+
+    city:
+      '<path d="M3 21V9h7v12m0-17h10v17M1 21h22M6 12h1m-1 4h1m7-9h2m-2 4h2m-2 4h2"/>',
+
+    community:
+      '<circle cx="9" cy="7" r="3"/><path d="M3 21v-4a6 6 0 0 1 12 0v4M17 4a3 3 0 0 1 0 6m2 11v-4a6 6 0 0 0-2-4"/>',
+
+    embassy:
+      '<path d="m3 8 9-5 9 5H3Zm0 13h18M5 8v10m7-10v10m7-10v10M3 18h18"/>',
+
+    play:
+      '<path d="m8 4 12 8-12 8Z"/>',
+
+    pause:
+      '<path d="M8 4v16M16 4v16"/>',
+
+    close:
+      '<path d="m6 6 12 12M6 18 18 6"/>',
+
+    swap:
+      '<path d="M8 3v18m-4-4 4 4 4-4M16 21V3m-4 4 4-4 4 4"/>',
+
+    print:
+      '<path d="M7 8V3h10v5M7 17H3V9h18v8h-4M7 14h10v7H7Z"/><path d="M17 11h1"/>',
+
+    pin:
+      '<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+
+    external:
+      '<path d="M14 3h7v7m0-7L10 14M10 3H3v18h18v-7"/>',
+
+    check:
+      '<path d="m4 12 5 5L20 6"/>'
+  };
+
+  const icon = name =>
+    '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    (svgPaths[name] || svgPaths.pin) +
+    '</svg>';
+
+  document.querySelectorAll('[data-icon]').forEach(element => {
+    element.innerHTML = icon(element.dataset.icon);
+  });
+
+  let currentDay = dayFromHash(location.hash);
+  let currentPanel = 'agenda';
+  let autoplay = null;
+  let toastTimer;
+
+  let map;
+  let backgroundRoutes;
+  let activeRoutes;
+  let markerLayer;
+  let labelLayer;
+  let tileLayer = null;
+  let positionLayer;
+
+  let baseMode = 'offline';
+  let routeHighlight = null;
+  let distanceSelection = null;
+
+  const smallScreen = () =>
+    matchMedia('(max-width: 820px)').matches;
+
+  const reducedMotion = () =>
+    matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function toast(message) {
+    $('toast').textContent = message;
+    $('toast').hidden = false;
+
+    clearTimeout(toastTimer);
+
+    toastTimer = setTimeout(() => {
+      $('toast').hidden = true;
+    }, 6500);
   }
-  function dayData() {return D.days.find(d=>d.day===currentDay);}
-  function currentPoints() {return currentDay==='all' ? Object.keys(places) : dayData().points;}
-  function selectedRoutes() {return (routeHighlight || (currentDay==='all' ? D.routes.map(r=>r.id) : dayData().legs)).map(id=>routesById[id]).filter(Boolean);}
+
+  function statusLabel(place) {
+    return place.precision === 'pending'
+      ? 'Ubicación pendiente'
+      : place.precision === 'area'
+        ? 'Referencia de la localidad'
+        : 'Ubicación del enlace';
+  }
+
+  function mapsLink(place) {
+    if (place.maps) return place.maps;
+
+    return (
+      'https://www.google.com/maps/search/?api=1&query=' +
+      encodeURIComponent(place.name + ', Mozambique')
+    );
+  }
+
+  function dayData() {
+    return D.days.find(day => day.day === currentDay);
+  }
+
+  function currentPoints() {
+    return currentDay === 'all'
+      ? Object.keys(places)
+      : dayData().points;
+  }
+
+  function selectedRoutes() {
+    return (
+      routeHighlight ||
+      (currentDay === 'all'
+        ? D.routes.map(route => route.id)
+        : dayData().legs)
+    )
+      .map(id => routesById[id])
+      .filter(Boolean);
+  }
+
   function renderTabs() {
-    $('day-tabs').innerHTML='<button type="button" class="day-tab '+(currentDay==='all'?'active':'')+'" data-day="all" aria-pressed="'+(currentDay==='all')+'"><span class="tab-date">Todo el viaje</span><span class="tab-place">21—27 septiembre</span></button>'+D.days.map(d=>'<button type="button" class="day-tab '+(currentDay===d.day?'active':'')+'" data-day="'+d.day+'" aria-pressed="'+(currentDay===d.day)+'" aria-label="'+d.weekday+' '+d.day+' de septiembre: '+esc(d.title)+'"><span class="tab-date"><span class="tab-number">'+d.day+'</span> '+d.abbr+'</span><span class="tab-place">'+esc(d.tab)+'</span></button>').join('');
+    $('day-tabs').innerHTML =
+      '<button type="button" class="day-tab ' +
+      (currentDay === 'all' ? 'active' : '') +
+      '" data-day="all" aria-pressed="' +
+      (currentDay === 'all') +
+      '">' +
+      '<span class="tab-date">Todo el viaje</span>' +
+      '<span class="tab-place">21—27 septiembre</span>' +
+      '</button>' +
+
+      D.days
+        .map(
+          day =>
+            '<button type="button" class="day-tab ' +
+            (currentDay === day.day ? 'active' : '') +
+            '" data-day="' +
+            day.day +
+            '" aria-pressed="' +
+            (currentDay === day.day) +
+            '" aria-label="' +
+            day.weekday +
+            ' ' +
+            day.day +
+            ' de septiembre: ' +
+            esc(day.title) +
+            '">' +
+            '<span class="tab-date"><span class="tab-number">' +
+            day.day +
+            '</span> ' +
+            day.abbr +
+            '</span>' +
+            '<span class="tab-place">' +
+            esc(day.tab) +
+            '</span>' +
+            '</button>'
+        )
+        .join('');
   }
+
   function renderAgenda() {
-    if (currentDay==='all') {
-      $('agenda-content').innerHTML='<div class="section-heading"><p class="eyebrow">FUNDACIÓN VICENTE FERRER</p><h2>Una semana<br>en Mozambique</h2><p>El itinerario de la visita, día a día.</p></div><div class="overview-stats"><div class="overview-stat"><strong>7</strong><span>días de visita</span></div><div class="overview-stat"><strong>10</strong><span>lugares previstos</span></div><div class="overview-stat"><strong>2</strong><span>reservas Limpopo</span></div></div>'+D.days.map(d=>'<button class="overview-card" type="button" data-day="'+d.day+'"><span class="overview-date"><strong>'+d.day+'</strong><span>'+d.abbr+'</span></span><span class="overview-copy"><strong>'+esc(d.title)+'</strong><small>'+esc(d.route)+'</small></span><span class="overview-arrow" aria-hidden="true">›</span></button>').join('')+'<div class="pending-list"><h3>Para completar antes del viaje</h3><p>Puntos de encuentro en Mpuzi y Machinho, ubicación exacta del centro de salud de Litlatla, pernocta del jueves y hora de visita a la Embajada.</p></div><p class="small-note">Horas locales de Mozambique · UTC+2.<br>Sábado 26 y domingo 27, según el calendario de 2026.</p>';
+    if (currentDay === 'all') {
+      $('agenda-content').innerHTML =
+        '<div class="section-heading">' +
+        '<p class="eyebrow">FUNDACIÓN VICENTE FERRER</p>' +
+        '<h2>Una semana<br>en Mozambique</h2>' +
+        '<p>El itinerario de la visita, día a día.</p>' +
+        '</div>' +
+
+        '<div class="overview-stats">' +
+        '<div class="overview-stat"><strong>7</strong><span>días de visita</span></div>' +
+        '<div class="overview-stat"><strong>10</strong><span>lugares previstos</span></div>' +
+        '<div class="overview-stat"><strong>2</strong><span>reservas Limpopo</span></div>' +
+        '</div>' +
+
+        D.days
+          .map(
+            day =>
+              '<button class="overview-card" type="button" data-day="' +
+              day.day +
+              '">' +
+              '<span class="overview-date"><strong>' +
+              day.day +
+              '</strong><span>' +
+              day.abbr +
+              '</span></span>' +
+              '<span class="overview-copy"><strong>' +
+              esc(day.title) +
+              '</strong><small>' +
+              esc(day.route) +
+              '</small></span>' +
+              '<span class="overview-arrow" aria-hidden="true">›</span>' +
+              '</button>'
+          )
+          .join('') +
+
+        '<div class="pending-list">' +
+        '<h3>Para completar antes del viaje</h3>' +
+        '<p>Puntos de encuentro en Mpuzi y Machinho, ubicación exacta del centro de salud de Litlatla, pernocta del jueves y hora de visita a la Embajada.</p>' +
+        '</div>' +
+
+        '<p class="small-note">Horas locales de Mozambique · UTC+2.<br>Sábado 26 y domingo 27, según el calendario de 2026.</p>';
+
       return;
     }
-    const d=dayData(), s=summaryForDay(d);
-    $('agenda-content').innerHTML='<div class="section-heading"><div class="day-heading-row"><p class="eyebrow">'+esc(d.weekday.toUpperCase())+' '+d.day+' SEPTIEMBRE</p><div class="day-controls"><button class="mini-button" data-step="-1" type="button" aria-label="Día anterior" '+(d.day===21?'disabled':'')+'>‹</button><button class="mini-button" data-step="1" type="button" aria-label="Día siguiente" '+(d.day===27?'disabled':'')+'>›</button></div></div><h2>'+esc(d.title)+'</h2><p class="day-route">'+esc(d.route)+'</p></div><div class="day-summary">'+icon('route')+'<div><strong>'+(d.day===26?'66 km / '+kmText(routesById['chokwe-maputo'].km):kmText(s.km))+(s.partial&&s.km!==null?' + tramo pendiente':'')+'</strong><small>'+esc(d.distanceNote)+'</small></div></div><div class="schedule">'+d.events.map(ev=>'<article class="event"><span class="event-dot" aria-hidden="true"></span><span class="event-time">'+esc(ev.time)+'</span><h3>'+esc(ev.title)+'</h3><p>'+esc(ev.text)+'</p>'+(ev.place ? '<button type="button" class="event-link" data-place="'+ev.place+'">'+icon('pin')+(places[ev.place].coords?'Situar en el mapa':'Consultar lugar pendiente')+'</button>' : '')+'</article>').join('')+'</div>'+(d.hotel ? '<div class="hotel-note">'+icon('hotel')+'<div><strong>'+esc(d.hotel.name)+'</strong><p>'+esc(d.hotel.text)+'</p><button type="button" class="event-link" data-place="'+d.hotel.place+'">Ver alojamiento '+icon('external')+'</button></div></div>' : '')+(d.note?'<p class="info-note">'+esc(d.note)+'</p>':'')+'<button class="button button-soft" type="button" data-open-distances="true">'+icon('route')+'Consultar distancias</button>';
+
+    const day = dayData();
+    const summary = summaryForDay(day);
+
+    $('agenda-content').innerHTML =
+      '<div class="section-heading">' +
+      '<div class="day-heading-row">' +
+      '<p class="eyebrow">' +
+      esc(day.weekday.toUpperCase()) +
+      ' ' +
+      day.day +
+      ' SEPTIEMBRE</p>' +
+
+      '<div class="day-controls">' +
+      '<button class="mini-button" data-step="-1" type="button" aria-label="Día anterior" ' +
+      (day.day === 21 ? 'disabled' : '') +
+      '>‹</button>' +
+
+      '<button class="mini-button" data-step="1" type="button" aria-label="Día siguiente" ' +
+      (day.day === 27 ? 'disabled' : '') +
+      '>›</button>' +
+
+      '</div>' +
+      '</div>' +
+
+      '<h2>' +
+      esc(day.title) +
+      '</h2>' +
+
+      '<p class="day-route">' +
+      esc(day.route) +
+      '</p>' +
+      '</div>' +
+
+      '<div class="day-summary">' +
+      icon('route') +
+      '<div><strong>' +
+      (day.day === 26
+        ? '66 km / ' + kmText(routesById['chokwe-maputo'].km)
+        : kmText(summary.km)) +
+      (summary.partial && summary.km !== null
+        ? ' + tramo pendiente'
+        : '') +
+      '</strong><small>' +
+      esc(day.distanceNote) +
+      '</small></div>' +
+      '</div>' +
+
+      '<div class="schedule">' +
+      day.events
+        .map(
+          event =>
+            '<article class="event">' +
+            '<span class="event-dot" aria-hidden="true"></span>' +
+            '<span class="event-time">' +
+            esc(event.time) +
+            '</span>' +
+            '<h3>' +
+            esc(event.title) +
+            '</h3>' +
+            '<p>' +
+            esc(event.text) +
+            '</p>' +
+            (event.place
+              ? '<button type="button" class="event-link" data-place="' +
+                event.place +
+                '">' +
+                icon('pin') +
+                (places[event.place].coords
+                  ? 'Situar en el mapa'
+                  : 'Consultar lugar pendiente') +
+                '</button>'
+              : '') +
+            '</article>'
+        )
+        .join('') +
+      '</div>' +
+
+      (day.hotel
+        ? '<div class="hotel-note">' +
+          icon('hotel') +
+          '<div><strong>' +
+          esc(day.hotel.name) +
+          '</strong><p>' +
+          esc(day.hotel.text) +
+          '</p>' +
+          '<button type="button" class="event-link" data-place="' +
+          day.hotel.place +
+          '">Ver alojamiento ' +
+          icon('external') +
+          '</button></div></div>'
+        : '') +
+
+      (day.note
+        ? '<p class="info-note">' +
+          esc(day.note) +
+          '</p>'
+        : '') +
+
+      '<button class="button button-soft" type="button" data-open-distances="true">' +
+      icon('route') +
+      'Consultar distancias</button>';
   }
+
   function renderPlaces() {
-    $('places-list').innerHTML=Object.entries(places).map(([id,p])=>'<article class="place-card" id="place-card-'+id+'"><div class="place-card-heading">'+icon(p.type)+'<h3>'+esc(p.name)+'</h3></div><span class="badge '+(p.precision==='point'?'':'pending')+'">'+statusLabel(p)+'</span><p>'+esc(p.note)+'</p><div class="place-card-actions">'+(p.coords?'<button type="button" class="button button-soft" data-place="'+id+'">'+icon('pin')+'Ver mapa</button>':'')+'<a class="button button-outline" href="'+esc(mapsLink(p))+'" target="_blank" rel="noopener noreferrer" data-online="true">'+icon('external')+(p.maps?'Google Maps':'Buscar en Maps')+'</a></div></article>').join('');
+    $('places-list').innerHTML = Object.entries(places)
+      .map(
+        ([id, place]) =>
+          '<article class="place-card" id="place-card-' +
+          id +
+          '">' +
+          '<div class="place-card-heading">' +
+          icon(place.type) +
+          '<h3>' +
+          esc(place.name) +
+          '</h3></div>' +
+
+          '<span class="badge ' +
+          (place.precision === 'point' ? '' : 'pending') +
+          '">' +
+          statusLabel(place) +
+          '</span>' +
+
+          '<p>' +
+          esc(place.note) +
+          '</p>' +
+
+          '<div class="place-card-actions">' +
+          (place.coords
+            ? '<button type="button" class="button button-soft" data-place="' +
+              id +
+              '">' +
+              icon('pin') +
+              'Ver mapa</button>'
+            : '') +
+
+          '<a class="button button-outline" href="' +
+          esc(mapsLink(place)) +
+          '" target="_blank" rel="noopener noreferrer" data-online="true">' +
+          icon('external') +
+          (place.maps ? 'Google Maps' : 'Buscar en Maps') +
+          '</a>' +
+
+          '</div></article>'
+      )
+      .join('');
   }
+
   function renderDistances() {
-    const options=Object.entries(places).map(([id,p])=>'<option value="'+id+'">'+esc(p.short)+'</option>').join('');
-    $('distance-from').innerHTML=options; $('distance-to').innerHTML=options;
-    $('distance-from').value='airport'; $('distance-to').value='limpopo';
-    $('distance-list').innerHTML=D.routes.map(r=>'<button class="distance-row" type="button" data-distance="'+r.id+'"><span><strong>'+esc(r.title)+'</strong><small>'+esc(r.kind==='road'?'Carretera · orientativo':r.kind==='provided'?'Dato del itinerario · trazado pendiente':'Sin distancia confirmada')+'</small></span><span class="distance-km">'+kmText(r.km)+'</span></button>').join('');
+    const options = Object.entries(places)
+      .map(
+        ([id, place]) =>
+          '<option value="' +
+          id +
+          '">' +
+          esc(place.short) +
+          '</option>'
+      )
+      .join('');
+
+    $('distance-from').innerHTML = options;
+    $('distance-to').innerHTML = options;
+
+    $('distance-from').value = 'airport';
+    $('distance-to').value = 'limpopo';
+
+    $('distance-list').innerHTML = D.routes
+      .map(
+        route =>
+          '<button class="distance-row" type="button" data-distance="' +
+          route.id +
+          '">' +
+          '<span><strong>' +
+          esc(route.title) +
+          '</strong><small>' +
+          esc(
+            route.kind === 'road'
+              ? 'Carretera · orientativo'
+              : route.kind === 'provided'
+                ? 'Dato del itinerario · trazado pendiente'
+                : 'Sin distancia confirmada'
+          ) +
+          '</small></span>' +
+          '<span class="distance-km">' +
+          kmText(route.km) +
+          '</span>' +
+          '</button>'
+      )
+      .join('');
+
     calculateDistance(false);
   }
+
   function calculateDistance(showMap) {
-    const from=$('distance-from').value, to=$('distance-to').value, result=distanceBetween(from,to);
+    const from = $('distance-from').value;
+    const to = $('distance-to').value;
+    const result = distanceBetween(from, to);
+
     if (!result) {
-      $('distance-result').innerHTML='<strong class="distance-value" style="font-size:1.5rem">Pendiente</strong><p>No hay una distancia por carretera guardada entre estos puntos. Debe confirmarse el trayecto con el equipo local.</p>';
-      distanceSelection=null;
+      $('distance-result').innerHTML =
+        '<strong class="distance-value" style="font-size:1.5rem">Pendiente</strong>' +
+        '<p>No hay una distancia por carretera guardada entre estos puntos. Debe confirmarse el trayecto con el equipo local.</p>';
+
+      distanceSelection = null;
       return;
     }
-    const via=result.nodes.slice(1,-1).map(id=>places[id].short);
-    let detail=result.path.length===0?'Has seleccionado el mismo punto.':result.path.length===1 ? (routesById[result.path[0].id].kind==='provided'?'Distancia facilitada en el itinerario.':'Distancia por carretera guardada.'):('Suma de tramos guardados vía '+via.join(' → ')+'. No es un cálculo nuevo de la ruta más corta.');
-    if (result.reverse) detail+=' Los tramos en sentido inverso son orientativos.';
-    const unmapped=result.path.some(x=>!routesById[x.id].geometry.length);
-    if (unmapped) detail+=' Hay tramos cuyo trazado exacto está pendiente.';
-    if (from==='maputo'||to==='maputo') detail+=' Maputo representa el centro urbano; el alojamiento no está definido.';
-    if (from==='airport'||to==='airport') detail+=' Referencia vial del aeropuerto: Rua do Aeroporto; no incluye todos los accesos interiores.';
-    $('distance-result').innerHTML='<strong class="distance-value">'+number(result.km)+'<small>km</small></strong><p>'+esc(detail)+'</p>'+(result.path.length?'<button class="button button-soft" id="show-distance-route" type="button">'+icon('map')+'Ver tramos en el mapa</button>':'');
-    distanceSelection=result.path.map(x=>x.id);
-    if (showMap) showDistanceMap();
+
+    const via = result.nodes
+      .slice(1, -1)
+      .map(id => places[id].short);
+
+    let detail =
+      result.path.length === 0
+        ? 'Has seleccionado el mismo punto.'
+        : result.path.length === 1
+          ? routesById[result.path[0].id].kind === 'provided'
+            ? 'Distancia facilitada en el itinerario.'
+            : 'Distancia por carretera guardada.'
+          : 'Suma de tramos guardados vía ' +
+            via.join(' → ') +
+            '. No es un cálculo nuevo de la ruta más corta.';
+
+    if (result.reverse) {
+      detail += ' Los tramos en sentido inverso son orientativos.';
+    }
+
+    const unmapped = result.path.some(
+      segment => !routesById[segment.id].geometry.length
+    );
+
+    if (unmapped) {
+      detail += ' Hay tramos cuyo trazado exacto está pendiente.';
+    }
+
+    if (from === 'maputo' || to === 'maputo') {
+      detail +=
+        ' Maputo representa el centro urbano; el alojamiento no está definido.';
+    }
+
+    if (from === 'airport' || to === 'airport') {
+      detail +=
+        ' Referencia vial del aeropuerto: Rua do Aeroporto; no incluye todos los accesos interiores.';
+    }
+
+    $('distance-result').innerHTML =
+      '<strong class="distance-value">' +
+      number(result.km) +
+      '<small>km</small></strong>' +
+      '<p>' +
+      esc(detail) +
+      '</p>' +
+      (result.path.length
+        ? '<button class="button button-soft" id="show-distance-route" type="button">' +
+          icon('map') +
+          'Ver tramos en el mapa</button>'
+        : '');
+
+    distanceSelection = result.path.map(segment => segment.id);
+
+    if (showMap) {
+      showDistanceMap();
+    }
   }
+
   function showDistanceMap() {
     if (!distanceSelection || !distanceSelection.length) return;
-    const available=distanceSelection.map(id=>routesById[id]);
-    if (!available.some(r=>r.geometry.length||(places[r.from].coords&&places[r.to].coords))) {
-      toast('Distancia guardada. El trazado no se muestra porque falta confirmar la ubicación exacta.'); return;
+
+    const available = distanceSelection.map(id => routesById[id]);
+
+    if (
+      !available.some(
+        route =>
+          route.geometry.length ||
+          (places[route.from].coords && places[route.to].coords)
+      )
+    ) {
+      toast(
+        'Distancia guardada. El trazado no se muestra porque falta confirmar la ubicación exacta.'
+      );
+      return;
     }
-    routeHighlight=distanceSelection.slice();
-    if (smallScreen()) setMobileView('map');
-    renderMap(false); fitActiveRoutes();
-    $('map-eyebrow').textContent='CONSULTA DE DISTANCIAS';
-    $('map-title').textContent=places[$('distance-from').value].short+' → '+places[$('distance-to').value].short;
+
+    routeHighlight = distanceSelection.slice();
+
+    if (smallScreen()) {
+      setMobileView('map');
+    }
+
+    renderMap(false);
+    fitActiveRoutes();
+
+    $('map-eyebrow').textContent = 'CONSULTA DE DISTANCIAS';
+    $('map-title').textContent =
+      places[$('distance-from').value].short +
+      ' → ' +
+      places[$('distance-to').value].short;
   }
+
   function showPanel(panel) {
-    currentPanel=panel;
-    for (const name of ['agenda','distances','places']) {
-      $(name+'-panel').hidden=name!==panel;
-      const tab=$('tab-'+name); tab.setAttribute('aria-selected',String(name===panel));tab.tabIndex=name===panel?0:-1;
+    currentPanel = panel;
+
+    for (const name of ['agenda', 'distances', 'places']) {
+      $(name + '-panel').hidden = name !== panel;
+
+      const tab = $('tab-' + name);
+
+      tab.setAttribute(
+        'aria-selected',
+        String(name === panel)
+      );
+
+      tab.tabIndex = name === panel ? 0 : -1;
     }
   }
+
   function setMobileView(view) {
-    document.body.dataset.mobileView=view;
-    document.querySelectorAll('[data-mobile]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mobile===view)));
-    if (view==='agenda') showPanel('agenda');
-    if (view==='distances') showPanel('distances');
-    if (view==='map' && map) requestAnimationFrame(()=>{map.invalidateSize({pan:false});fitMap();});
+    document.body.dataset.mobileView = view;
+
+    document.querySelectorAll('[data-mobile]').forEach(button => {
+      button.setAttribute(
+        'aria-pressed',
+        String(button.dataset.mobile === view)
+      );
+    });
+
+    if (view === 'agenda') {
+      showPanel('agenda');
+    }
+
+    if (view === 'distances') {
+      showPanel('distances');
+    }
+
+    if (view === 'map' && map) {
+      requestAnimationFrame(() => {
+        map.invalidateSize({ pan: false });
+        fitMap();
+      });
+    }
   }
+
   function renderMobileSummary() {
-    const d=dayData();
-    $('mobile-map-summary').innerHTML='<div class="summary-copy"><strong>'+esc(d?d.title:'Visita Mozambique 2026')+'</strong><small>'+esc(d?d.weekday+' '+d.day+' · '+d.route:'21—27 septiembre · 7 días de visita')+'</small></div><button type="button" data-view-agenda="true">Ver agenda</button>';
+    const day = dayData();
+
+    $('mobile-map-summary').innerHTML =
+      '<div class="summary-copy"><strong>' +
+      esc(day ? day.title : 'Visita Mozambique 2026') +
+      '</strong><small>' +
+      esc(
+        day
+          ? day.weekday + ' ' + day.day + ' · ' + day.route
+          : '21—27 septiembre · 7 días de visita'
+      ) +
+      '</small></div>' +
+      '<button type="button" data-view-agenda="true">Ver agenda</button>';
   }
-  function selectDay(value, options={}) {
-    if (!options.autoplay) stopPlay();
-    const day=value==='all'?'all':Number(value);
-    if (day!=='all'&&!D.days.some(d=>d.day===day)) return;
-    currentDay=day; routeHighlight=null;
-    if (options.history!==false) {try {history.replaceState(null,'',day==='all'?'#viaje':'#dia-'+day);}catch(_) {}}
-    renderTabs(); renderAgenda(); renderMobileSummary(); renderMap(true);
-    const tab=$('day-tabs').querySelector('.active');
-    if (smallScreen()&&tab) tab.scrollIntoView({behavior:reducedMotion()?'instant':'smooth',block:'nearest',inline:'center'});
+
+  function selectDay(value, options = {}) {
+    if (!options.autoplay) {
+      stopPlay();
+    }
+
+    const day = value === 'all' ? 'all' : Number(value);
+
+    if (
+      day !== 'all' &&
+      !D.days.some(item => item.day === day)
+    ) {
+      return;
+    }
+
+    currentDay = day;
+    routeHighlight = null;
+
+    if (options.history !== false) {
+      try {
+        history.replaceState(
+          null,
+          '',
+          day === 'all' ? '#viaje' : '#dia-' + day
+        );
+      } catch (_) {}
+    }
+
+    renderTabs();
+    renderAgenda();
+    renderMobileSummary();
+    renderMap(true);
+
+    const tab = $('day-tabs').querySelector('.active');
+
+    if (smallScreen() && tab) {
+      tab.scrollIntoView({
+        behavior: reducedMotion() ? 'instant' : 'smooth',
+        block: 'nearest',
+        inline: 'center'
+      });
+    }
   }
+
   function initMap() {
-    if (!window.L) { $('map-status').textContent='No se ha podido iniciar el mapa. Revisa que app.js esté completo.'; return; }
-    map=L.map('map',{zoomControl:false,minZoom:5,maxZoom:19,preferCanvas:true,attributionControl:true,scrollWheelZoom:true,worldCopyJump:false}).setView([-24.1,32.5],7);
-    map.setMaxBounds([[-29,28],[-19,37]]);
-    map.createPane('offlineLand');map.getPane('offlineLand').style.zIndex=180;
-    L.geoJSON(D.basemap,{pane:'offlineLand',interactive:false,style:f=>({fillColor:f.properties.code==='MOZ'?'#f4f7ed':'#e4ebe6',fillOpacity:1,color:'#a9c2bd',weight:1.3})}).addTo(map);
-    map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
-    map.attributionControl.addAttribution('Límites: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> · Rutas © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>');
-    backgroundRoutes=L.layerGroup().addTo(map);activeRoutes=L.layerGroup().addTo(map);markerLayer=L.layerGroup().addTo(map);labelLayer=L.layerGroup().addTo(map);
-    for (const r of D.routes.filter(x=>x.geometry.length)) L.polyline(r.geometry.map(c=>[c[1],c[0]]),{color:'#8badaf',weight:2,opacity:.62,interactive:false}).addTo(backgroundRoutes);
-    L.control.scale({imperial:false,maxWidth:110}).addTo(map);
-    map.on('zoomend',()=>{renderMarkers();renderGeoLabels();});
-    new ResizeObserver(()=>map.invalidateSize({pan:false})).observe($('map'));
+    if (!window.L) {
+      $('map-status').textContent =
+        'No se ha podido iniciar el mapa. Revisa que app.js esté completo.';
+      return;
+    }
+
+    map = L.map('map', {
+      zoomControl: false,
+      minZoom: 5,
+      maxZoom: 19,
+      preferCanvas: true,
+      attributionControl: true,
+      scrollWheelZoom: true,
+      worldCopyJump: false
+    }).setView([-24.1, 32.5], 7);
+
+    map.setMaxBounds([
+      [-29, 28],
+      [-19, 37]
+    ]);
+
+    map.createPane('offlineLand');
+    map.getPane('offlineLand').style.zIndex = 180;
+
+    L.geoJSON(D.basemap, {
+      pane: 'offlineLand',
+      interactive: false,
+      style: feature => ({
+        fillColor:
+          feature.properties.code === 'MOZ'
+            ? '#f4f7ed'
+            : '#e4ebe6',
+        fillOpacity: 1,
+        color: '#a9c2bd',
+        weight: 1.3
+      })
+    }).addTo(map);
+
+    map.attributionControl.setPrefix(
+      '<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>'
+    );
+
+    map.attributionControl.addAttribution(
+      'Límites: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> · Rutas © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+    );
+
+    backgroundRoutes = L.layerGroup().addTo(map);
+    activeRoutes = L.layerGroup().addTo(map);
+    markerLayer = L.layerGroup().addTo(map);
+    labelLayer = L.layerGroup().addTo(map);
+
+    for (const route of D.routes.filter(item => item.geometry.length)) {
+      L.polyline(
+        route.geometry.map(coordinate => [
+          coordinate[1],
+          coordinate[0]
+        ]),
+        {
+          color: '#8badaf',
+          weight: 2,
+          opacity: 0.62,
+          interactive: false
+        }
+      ).addTo(backgroundRoutes);
+    }
+
+    L.control
+      .scale({
+        imperial: false,
+        maxWidth: 110
+      })
+      .addTo(map);
+
+    map.on('zoomend', () => {
+      renderMarkers();
+      renderGeoLabels();
+    });
+
+    new ResizeObserver(() =>
+      map.invalidateSize({ pan: false })
+    ).observe($('map'));
+
     renderGeoLabels();
   }
+
   function renderGeoLabels() {
-    if (!labelLayer) return; labelLayer.clearLayers();
-    if (map.getZoom()>9 || baseMode==='streets') return;
-    const labels=[[-23.5,33.25,'MOZAMBIQUE','country-label primary'],[-25.45,30.75,'SUDÁFRICA','country-label'],[-21.9,30.7,'ZIMBABUE','country-label'],[-26.52,31.4,'ESUATINI','country-label'],[-25.35,34.35,'Océano Índico','sea-label']];
-    labels.forEach(([lat,lng,text,cls])=>L.marker([lat,lng],{interactive:false,keyboard:false,icon:L.divIcon({className:cls,html:esc(text),iconSize:[140,20],iconAnchor:[70,10]}),zIndexOffset:-800}).addTo(labelLayer));
+    if (!labelLayer) return;
+
+    labelLayer.clearLayers();
+
+    if (map.getZoom() > 9) return;
+
+    const labels = [
+      [-23.5, 33.25, 'MOZAMBIQUE', 'country-label primary'],
+      [-25.45, 30.75, 'SUDÁFRICA', 'country-label'],
+      [-21.9, 30.7, 'ZIMBABUE', 'country-label'],
+      [-26.52, 31.4, 'ESUATINI', 'country-label'],
+      [-25.35, 34.35, 'Océano Índico', 'sea-label']
+    ];
+
+    labels.forEach(([lat, lng, text, className]) => {
+      L.marker([lat, lng], {
+        interactive: false,
+        keyboard: false,
+        icon: L.divIcon({
+          className,
+          html: esc(text),
+          iconSize: [140, 20],
+          iconAnchor: [70, 10]
+        }),
+        zIndexOffset: -800
+      }).addTo(labelLayer);
+    });
   }
-  function routePopup(r) {return '<div class="route-popup"><h3>'+esc(r.title)+'</h3><div class="popup-km">'+kmText(r.km)+'</div><p>'+esc(r.source)+'</p><p>'+esc(r.note)+'</p></div>';}
-  function plotRoute(r) {
-    let coords=r.geometry.map(c=>[c[1],c[0]]), schematic=false;
-    if (!coords.length && places[r.from].coords && places[r.to].coords) {coords=[places[r.from].coords,places[r.to].coords]; schematic=true;}
-    if (!coords.length) return;
-    if (!schematic) L.polyline(coords,{color:'#fff',weight:8,opacity:.85,interactive:false}).addTo(activeRoutes);
-    L.polyline(coords,{color:schematic?'#94701d':'#e65b28',weight:schematic?3:4.5,opacity:.96,dashArray:schematic?'5 8':null,lineCap:'round'}).bindPopup(routePopup(r)+(schematic?'<p class="small-note">Línea esquemática entre localidades; no representa la carretera.</p>':''),{maxWidth:310}).addTo(activeRoutes);
+
+  function routePopup(route) {
+    return (
+      '<div class="route-popup">' +
+      '<h3>' +
+      esc(route.title) +
+      '</h3>' +
+      '<div class="popup-km">' +
+      kmText(route.km) +
+      '</div>' +
+      '<p>' +
+      esc(route.source) +
+      '</p>' +
+      '<p>' +
+      esc(route.note) +
+      '</p>' +
+      '</div>'
+    );
   }
+
+  function plotRoute(route) {
+    let coordinates = route.geometry.map(coordinate => [
+      coordinate[1],
+      coordinate[0]
+    ]);
+
+    let schematic = false;
+
+    if (
+      !coordinates.length &&
+      places[route.from].coords &&
+      places[route.to].coords
+    ) {
+      coordinates = [
+        places[route.from].coords,
+        places[route.to].coords
+      ];
+
+      schematic = true;
+    }
+
+    if (!coordinates.length) return;
+
+    if (!schematic) {
+      L.polyline(coordinates, {
+        color: '#fff',
+        weight: 8,
+        opacity: 0.85,
+        interactive: false
+      }).addTo(activeRoutes);
+    }
+
+    L.polyline(coordinates, {
+      color: schematic ? '#94701d' : '#e65b28',
+      weight: schematic ? 3 : 4.5,
+      opacity: 0.96,
+      dashArray: schematic ? '5 8' : null,
+      lineCap: 'round'
+    })
+      .bindPopup(
+        routePopup(route) +
+          (schematic
+            ? '<p class="small-note">Línea esquemática entre localidades; no representa la carretera.</p>'
+            : ''),
+        {
+          maxWidth: 310
+        }
+      )
+      .addTo(activeRoutes);
+  }
+
   function renderMap(fit) {
     if (!map) return;
-    activeRoutes.clearLayers();selectedRoutes().forEach(plotRoute);renderMarkers();
-    const d=dayData();
-    $('map-eyebrow').textContent=d?d.weekday.toUpperCase()+' '+d.day+' SEPTIEMBRE':'RECORRIDO COMPLETO';
-    $('map-title').textContent=d?d.route:'Maputo · Chókwè · Mapai';
-    $('map-status').textContent=baseMode==='streets'?'Vista de calles · necesita internet':selectedRoutes().some(r=>r.kind==='provided'&&places[r.from].coords&&places[r.to].coords)?'Línea discontinua: enlace esquemático':'Mapa básico disponible sin conexión';
-    if (fit) fitMap();
-  }
-  function allBounds() {
-    let ids=currentPoints();
-    if (routeHighlight) ids=[...new Set(selectedRoutes().flatMap(r=>[r.from,r.to]))];
-    const points=ids.map(id=>places[id].coords).filter(Boolean);
-    selectedRoutes().forEach(r=>r.geometry.forEach(c=>points.push([c[1],c[0]])));
-    return points.length?L.latLngBounds(points):null;
-  }
-  function fitMap() {
-    if (!map) return;const bounds=allBounds();if(!bounds)return;
-    const mobile=smallScreen();
-    map.invalidateSize({pan:false});
-    const d=dayData();
-    map.fitBounds(bounds,{paddingTopLeft:mobile?[45,155]:[90,170],paddingBottomRight:mobile?[55,170]:[80,120],maxZoom:currentDay==='all'?8:d&&d.day===23?11:13,animate:!reducedMotion(),duration:.6});
-  }
-  function fitActiveRoutes() {fitMap();}
-  function placePopup(id) {
-    const p=places[id];
-    return '<div class="place-popup"><p class="eyebrow">'+esc(p.days.map(d=>d+' SEP').join(' · '))+'</p><h3>'+esc(p.name)+'</h3><span class="badge '+(p.precision==='point'?'':'pending')+'">'+statusLabel(p)+'</span><p>'+esc(p.note)+'</p><a class="button button-soft" href="'+esc(mapsLink(p))+'" target="_blank" rel="noopener noreferrer" data-online="true">'+icon('external')+(p.maps?'Abrir Google Maps':'Buscar en Google Maps')+'</a><p class="small-note">El enlace externo necesita internet.</p></div>';
-  }
-  function renderMarkers() {
-    if (!map||!markerLayer) return;markerLayer.clearLayers();
-    const ids=routeHighlight?[...new Set(selectedRoutes().flatMap(r=>[r.from,r.to]))]:currentPoints();
-    const groups=[];
-    for (const id of ids.filter(id=>places[id].coords)) {
-      const pt=map.latLngToLayerPoint(places[id].coords);
-      const group=groups.find(g=>g.pixel.distanceTo(pt)<43);
-      if(group) group.ids.push(id); else groups.push({ids:[id],pixel:pt});
+
+    activeRoutes.clearLayers();
+
+    selectedRoutes().forEach(plotRoute);
+    renderMarkers();
+
+    const day = dayData();
+
+    $('map-eyebrow').textContent = day
+      ? day.weekday.toUpperCase() +
+        ' ' +
+        day.day +
+        ' SEPTIEMBRE'
+      : 'RECORRIDO COMPLETO';
+
+    $('map-title').textContent = day
+      ? day.route
+      : 'Maputo · Chókwè · Mapai';
+
+    $('map-status').textContent = selectedRoutes().some(
+      route =>
+        route.kind === 'provided' &&
+        places[route.from].coords &&
+        places[route.to].coords
+    )
+      ? 'Línea discontinua: enlace esquemático'
+      : 'Mapa básico disponible sin conexión';
+
+    if (fit) {
+      fitMap();
     }
-    groups.forEach(group=>{
-      if(group.ids.length>1) {
-        const coords=group.ids.map(id=>places[id].coords);
-        const center=[coords.reduce((s,p)=>s+p[0],0)/coords.length,coords.reduce((s,p)=>s+p[1],0)/coords.length];
-        const label=group.ids.some(id=>id==='limpopo'||id==='carmelo')?'Chókwè':'Maputo';
-        const marker=L.marker(center,{title:label+' · '+group.ids.length+' lugares',alt:label+' · '+group.ids.length+' lugares',icon:L.divIcon({className:'place-pin',html:'<span class="pin-face city">'+group.ids.length+'</span>',iconSize:[38,38],iconAnchor:[19,19]})}).addTo(markerLayer);
-        marker.bindTooltip(label+' · '+group.ids.length,{permanent:true,direction:'right',offset:[19,0],className:'place-label'});
-        marker.on('click',()=>map.fitBounds(L.latLngBounds(coords),{padding:[75,125],maxZoom:16,animate:!reducedMotion()}));
+  }
+
+  function allBounds() {
+    let ids = currentPoints();
+
+    if (routeHighlight) {
+      ids = [
+        ...new Set(
+          selectedRoutes().flatMap(route => [
+            route.from,
+            route.to
+          ])
+        )
+      ];
+    }
+
+    const points = ids
+      .map(id => places[id].coords)
+      .filter(Boolean);
+
+    selectedRoutes().forEach(route => {
+      route.geometry.forEach(coordinate => {
+        points.push([coordinate[1], coordinate[0]]);
+      });
+    });
+
+    return points.length ? L.latLngBounds(points) : null;
+  }
+
+  function fitMap() {
+    if (!map) return;
+
+    const bounds = allBounds();
+    if (!bounds) return;
+
+    const mobile = smallScreen();
+
+    map.invalidateSize({ pan: false });
+
+    const day = dayData();
+
+    map.fitBounds(bounds, {
+      paddingTopLeft: mobile ? [45, 155] : [90, 170],
+      paddingBottomRight: mobile ? [55, 170] : [80, 120],
+      maxZoom:
+        currentDay === 'all'
+          ? 8
+          : day && day.day === 23
+            ? 11
+            : 13,
+      animate: !reducedMotion(),
+      duration: 0.6
+    });
+  }
+
+  function fitActiveRoutes() {
+    fitMap();
+  }
+
+  function placePopup(id) {
+    const place = places[id];
+
+    return (
+      '<div class="place-popup">' +
+      '<p class="eyebrow">' +
+      esc(place.days.map(day => day + ' SEP').join(' · ')) +
+      '</p>' +
+      '<h3>' +
+      esc(place.name) +
+      '</h3>' +
+      '<span class="badge ' +
+      (place.precision === 'point' ? '' : 'pending') +
+      '">' +
+      statusLabel(place) +
+      '</span>' +
+      '<p>' +
+      esc(place.note) +
+      '</p>' +
+      '<a class="button button-soft" href="' +
+      esc(mapsLink(place)) +
+      '" target="_blank" rel="noopener noreferrer" data-online="true">' +
+      icon('external') +
+      (place.maps
+        ? 'Abrir Google Maps'
+        : 'Buscar en Google Maps') +
+      '</a>' +
+      '<p class="small-note">El enlace externo necesita internet.</p>' +
+      '</div>'
+    );
+  }
+
+  function renderMarkers() {
+    if (!map || !markerLayer) return;
+
+    markerLayer.clearLayers();
+
+    const ids = routeHighlight
+      ? [
+          ...new Set(
+            selectedRoutes().flatMap(route => [
+              route.from,
+              route.to
+            ])
+          )
+        ]
+      : currentPoints();
+
+    const groups = [];
+
+    for (const id of ids.filter(id => places[id].coords)) {
+      const point = map.latLngToLayerPoint(
+        places[id].coords
+      );
+
+      const group = groups.find(
+        item => item.pixel.distanceTo(point) < 43
+      );
+
+      if (group) {
+        group.ids.push(id);
+      } else {
+        groups.push({
+          ids: [id],
+          pixel: point
+        });
+      }
+    }
+
+    groups.forEach(group => {
+      if (group.ids.length > 1) {
+        const coordinates = group.ids.map(
+          id => places[id].coords
+        );
+
+        const center = [
+          coordinates.reduce((sum, point) => sum + point[0], 0) /
+            coordinates.length,
+          coordinates.reduce((sum, point) => sum + point[1], 0) /
+            coordinates.length
+        ];
+
+        const label = group.ids.some(
+          id => id === 'limpopo' || id === 'carmelo'
+        )
+          ? 'Chókwè'
+          : 'Maputo';
+
+        const marker = L.marker(center, {
+          title: label + ' · ' + group.ids.length + ' lugares',
+          alt: label + ' · ' + group.ids.length + ' lugares',
+          icon: L.divIcon({
+            className: 'place-pin',
+            html:
+              '<span class="pin-face city">' +
+              group.ids.length +
+              '</span>',
+            iconSize: [38, 38],
+            iconAnchor: [19, 19]
+          })
+        }).addTo(markerLayer);
+
+        marker.bindTooltip(
+          label + ' · ' + group.ids.length,
+          {
+            permanent: true,
+            direction: 'right',
+            offset: [19, 0],
+            className: 'place-label'
+          }
+        );
+
+        marker.on('click', () =>
+          map.fitBounds(L.latLngBounds(coordinates), {
+            padding: [75, 125],
+            maxZoom: 16,
+            animate: !reducedMotion()
+          })
+        );
+
         return;
       }
-      const id=group.ids[0],p=places[id];
-      const marker=L.marker(p.coords,{title:p.name,alt:p.name,icon:L.divIcon({className:'place-pin',html:'<span class="pin-face '+p.type+(p.precision==='area'?' approx':'')+'">'+icon(p.type)+'</span>',iconSize:[38,38],iconAnchor:[19,19],popupAnchor:[0,-17]})}).addTo(markerLayer);
-      marker.bindPopup(placePopup(id),{maxWidth:300,autoPanPaddingTopLeft:[18,100],autoPanPaddingBottomRight:[18,smallScreen()?145:80]});
-      const label=id==='ka'&&map.getZoom()<10?'Mapai · Ka Hariane':p.short;
-      if (map.getZoom()<9 || map.getZoom()>=13 || ids.length<4) marker.bindTooltip(label,{permanent:true,direction:'right',offset:[19,0],className:'place-label'});
+
+      const id = group.ids[0];
+      const place = places[id];
+
+      const marker = L.marker(place.coords, {
+        title: place.name,
+        alt: place.name,
+        icon: L.divIcon({
+          className: 'place-pin',
+          html:
+            '<span class="pin-face ' +
+            place.type +
+            (place.precision === 'area' ? ' approx' : '') +
+            '">' +
+            icon(place.type) +
+            '</span>',
+          iconSize: [38, 38],
+          iconAnchor: [19, 19],
+          popupAnchor: [0, -17]
+        })
+      }).addTo(markerLayer);
+
+      marker.bindPopup(placePopup(id), {
+        maxWidth: 300,
+        autoPanPaddingTopLeft: [18, 100],
+        autoPanPaddingBottomRight: [
+          18,
+          smallScreen() ? 145 : 80
+        ]
+      });
+
+      const label =
+        id === 'ka' && map.getZoom() < 10
+          ? 'Mapai · Ka Hariane'
+          : place.short;
+
+      if (
+        map.getZoom() < 9 ||
+        map.getZoom() >= 13 ||
+        ids.length < 4
+      ) {
+        marker.bindTooltip(label, {
+          permanent: true,
+          direction: 'right',
+          offset: [19, 0],
+          className: 'place-label'
+        });
+      }
     });
   }
+
   function focusPlace(id) {
-    stopPlay();const p=places[id];if(!p)return;
-    if(!p.coords) {showPanel('places');if(smallScreen()){document.body.dataset.mobileView='agenda';document.querySelectorAll('[data-mobile]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mobile==='agenda')));}requestAnimationFrame(()=>$('place-card-'+id).scrollIntoView({block:'center',behavior:reducedMotion()?'instant':'smooth'}));toast(p.note);return;}
-    routeHighlight=null;
-    if(smallScreen())setMobileView('map');
-    requestAnimationFrame(()=>{
-      map.invalidateSize({pan:false});
-      map.setView(p.coords,p.precision==='area'?12:16,{animate:!reducedMotion()});
-      L.popup({maxWidth:300,autoPanPaddingTopLeft:[18,100],autoPanPaddingBottomRight:[18,smallScreen()?155:90]}).setLatLng(p.coords).setContent(placePopup(id)).openOn(map);
-    });
-  }
-  function changeBase(mode) {
-    if(mode==='streets'&&!navigator.onLine){toast('La vista de calles necesita internet. El mapa guardado sigue disponible.');return;}
-    if(tileLayer){map.removeLayer(tileLayer);tileLayer=null;}
-    baseMode=mode;
-    if(mode==='streets') {
-      let errors=0;
-      tileLayer=L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'}).addTo(map);
-      tileLayer.on('tileerror',()=>{errors++;if(errors===3&&baseMode==='streets'){changeBase('offline');toast('No se ha podido cargar la vista de calles. Se mantiene el mapa guardado.');}});
+    stopPlay();
+
+    const place = places[id];
+    if (!place) return;
+
+    if (!place.coords) {
+      showPanel('places');
+
+      if (smallScreen()) {
+        document.body.dataset.mobileView = 'agenda';
+
+        document
+          .querySelectorAll('[data-mobile]')
+          .forEach(button => {
+            button.setAttribute(
+              'aria-pressed',
+              String(button.dataset.mobile === 'agenda')
+            );
+          });
+      }
+
+      requestAnimationFrame(() =>
+        $('place-card-' + id).scrollIntoView({
+          block: 'center',
+          behavior: reducedMotion() ? 'instant' : 'smooth'
+        })
+      );
+
+      toast(place.note);
+      return;
     }
-    $('base-offline').setAttribute('aria-pressed',String(mode==='offline'));$('base-streets').setAttribute('aria-pressed',String(mode==='streets'));renderGeoLabels();renderMap(false);
-  }
-  function stopPlay() {clearInterval(autoplay);autoplay=null;$('play-journey').setAttribute('aria-pressed','false');$('play-journey').innerHTML=icon('play')+'<span>Recorrer días</span>';}
-  function play() {
-    if(autoplay){stopPlay();return;}
-    if(currentDay==='all'||currentDay===27)selectDay(21,{autoplay:true});
-    $('play-journey').setAttribute('aria-pressed','true');$('play-journey').innerHTML=icon('pause')+'<span>Pausar recorrido</span>';
-    autoplay=setInterval(()=>{if(currentDay===27){stopPlay();return;}selectDay(Number(currentDay)+1,{autoplay:true});},6500);
-  }
-  function locate() {
-    if(!navigator.geolocation){toast('Este navegador no permite obtener la ubicación.');return;}
-    toast('Buscando tu ubicación…');
-    navigator.geolocation.getCurrentPosition(position=>{
-      const {latitude,longitude,accuracy}=position.coords;
-      if(positionLayer)map.removeLayer(positionLayer);
-      positionLayer=L.layerGroup([L.circle([latitude,longitude],{radius:accuracy,color:'#1678ad',fillOpacity:.1,weight:1}),L.circleMarker([latitude,longitude],{radius:7,fillColor:'#1678ad',fillOpacity:1,color:'#fff',weight:3})]).addTo(map);
-      if(latitude < -29||latitude > -19||longitude < 28||longitude > 37){toast('Tu ubicación está fuera de la zona de esta visita.');return;}
-      map.setView([latitude,longitude],13);toast('Ubicación aproximada: margen de '+Math.round(accuracy)+' metros.');
-    },()=>toast('No se pudo obtener tu ubicación. Puedes seguir consultando el mapa y las distancias guardadas.'),{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
-  }
-  function renderPrint() {
-    $('print-itinerary').innerHTML='<div class="print-header"><p>FUNDACIÓN VICENTE FERRER</p><h1>Visita Mozambique 2026</h1><p>21—27 septiembre · Todas las horas son locales (UTC+2).</p></div>'+D.days.map(d=>'<article class="print-day"><h2>'+esc(d.weekday)+' '+d.day+' · '+esc(d.title)+'</h2><p>'+esc(d.route)+'</p>'+d.events.map(e=>'<h3>'+esc(e.time)+' · '+esc(e.title)+'</h3><p>'+esc(e.text)+'</p>').join('')+(d.note?'<p><strong>Nota:</strong> '+esc(d.note)+'</p>':'')+'</article>').join('')+'<h2>Distancias guardadas</h2><table><thead><tr><th>Tramo</th><th>Distancia</th><th>Referencia</th></tr></thead><tbody>'+D.routes.map(r=>'<tr><td>'+esc(r.title)+'</td><td>'+kmText(r.km)+'</td><td>'+esc(r.source)+'</td></tr>').join('')+'</tbody></table><p>Distancias orientativas. Mpuzi y Machinho: ubicación exacta pendiente. Litlatla: referencia de la aldea; centro de salud pendiente. Regreso y pernocta del jueves por confirmar.</p>';
-  }
-  // Offline status is based on a complete, verified cache, not localStorage.
-  let offlineReady=false, swRegistration=null, registrationPromise=null, saving=false;
-  function updateConnection() {
-    const label=navigator.onLine?(offlineReady?'Conexión · copia guardada':'Con conexión'):(offlineReady?'Sin conexión · guía disponible':'Sin conexión');
-    $('connection-status').textContent=label;$('connection-status').classList.toggle('is-offline',!navigator.onLine);
-    if(!navigator.onLine&&baseMode==='streets')changeBase('offline');
-  }
-  function swMessage(worker,type) {
-    return new Promise((resolve,reject)=>{
-      if(!worker){reject(new Error('El guardado todavía no está preparado.'));return;}
-      const channel=new MessageChannel();
-      const timer=setTimeout(()=>{channel.port1.close();reject(new Error('No se ha podido comprobar el guardado. Vuelve a intentarlo con conexión.'));},30000);
-      channel.port1.onmessage=event=>{clearTimeout(timer);channel.port1.close();event.data.ok?resolve(event.data):reject(new Error(event.data.error||'Guardado incompleto.'));};
-      worker.postMessage({type},[channel.port2]);
+
+    routeHighlight = null;
+
+    if (smallScreen()) {
+      setMobileView('map');
+    }
+
+    requestAnimationFrame(() => {
+      map.invalidateSize({ pan: false });
+
+      map.setView(
+        place.coords,
+        place.precision === 'area' ? 12 : 16,
+        {
+          animate: !reducedMotion()
+        }
+      );
+
+      L.popup({
+        maxWidth: 300,
+        autoPanPaddingTopLeft: [18, 100],
+        autoPanPaddingBottomRight: [
+          18,
+          smallScreen() ? 155 : 90
+        ]
+      })
+        .setLatLng(place.coords)
+        .setContent(placePopup(id))
+        .openOn(map);
     });
   }
-  function markReady(ready) {
-    offlineReady=ready;$('offline-button-label').textContent=ready?'Disponible sin conexión':'Guardar sin conexión';
-    $('offline-detail').textContent=ready?'La agenda, las distancias y el mapa básico están guardados en este navegador.':'Todavía no se ha confirmado una copia completa.';updateConnection();
+
+  function changeBase() {
+    if (tileLayer) {
+      map.removeLayer(tileLayer);
+      tileLayer = null;
+    }
+
+    baseMode = 'offline';
+
+    const offlineButton = $('base-offline');
+
+    if (offlineButton) {
+      offlineButton.setAttribute('aria-pressed', 'true');
+    }
+
+    renderGeoLabels();
+    renderMap(false);
   }
+
+  function stopPlay() {
+    clearInterval(autoplay);
+    autoplay = null;
+
+    $('play-journey').setAttribute(
+      'aria-pressed',
+      'false'
+    );
+
+    $('play-journey').innerHTML =
+      icon('play') +
+      '<span>Recorrer días</span>';
+  }
+
+  function play() {
+    if (autoplay) {
+      stopPlay();
+      return;
+    }
+
+    if (currentDay === 'all' || currentDay === 27) {
+      selectDay(21, {
+        autoplay: true
+      });
+    }
+
+    $('play-journey').setAttribute(
+      'aria-pressed',
+      'true'
+    );
+
+    $('play-journey').innerHTML =
+      icon('pause') +
+      '<span>Pausar recorrido</span>';
+
+    autoplay = setInterval(() => {
+      if (currentDay === 27) {
+        stopPlay();
+        return;
+      }
+
+      selectDay(Number(currentDay) + 1, {
+        autoplay: true
+      });
+    }, 6500);
+  }
+
+  function locate() {
+    if (!navigator.geolocation) {
+      toast('Este navegador no permite obtener la ubicación.');
+      return;
+    }
+
+    toast('Buscando tu ubicación…');
+
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        const {
+          latitude,
+          longitude,
+          accuracy
+        } = position.coords;
+
+        if (positionLayer) {
+          map.removeLayer(positionLayer);
+        }
+
+        positionLayer = L.layerGroup([
+          L.circle([latitude, longitude], {
+            radius: accuracy,
+            color: '#1678ad',
+            fillOpacity: 0.1,
+            weight: 1
+          }),
+
+          L.circleMarker([latitude, longitude], {
+            radius: 7,
+            fillColor: '#1678ad',
+            fillOpacity: 1,
+            color: '#fff',
+            weight: 3
+          })
+        ]).addTo(map);
+
+        if (
+          latitude < -29 ||
+          latitude > -19 ||
+          longitude < 28 ||
+          longitude > 37
+        ) {
+          toast(
+            'Tu ubicación está fuera de la zona de esta visita.'
+          );
+          return;
+        }
+
+        map.setView([latitude, longitude], 13);
+
+        toast(
+          'Ubicación aproximada: margen de ' +
+          Math.round(accuracy) +
+          ' metros.'
+        );
+      },
+      () =>
+        toast(
+          'No se pudo obtener tu ubicación. Puedes seguir consultando el mapa y las distancias guardadas.'
+        ),
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 60000
+      }
+    );
+  }
+
+  function renderPrint() {
+    $('print-itinerary').innerHTML =
+      '<div class="print-header">' +
+      '<p>FUNDACIÓN VICENTE FERRER</p>' +
+      '<h1>Visita Mozambique 2026</h1>' +
+      '<p>21—27 septiembre · Todas las horas son locales (UTC+2).</p>' +
+      '</div>' +
+
+      D.days
+        .map(
+          day =>
+            '<article class="print-day">' +
+            '<h2>' +
+            esc(day.weekday) +
+            ' ' +
+            day.day +
+            ' · ' +
+            esc(day.title) +
+            '</h2>' +
+            '<p>' +
+            esc(day.route) +
+            '</p>' +
+
+            day.events
+              .map(
+                event =>
+                  '<h3>' +
+                  esc(event.time) +
+                  ' · ' +
+                  esc(event.title) +
+                  '</h3>' +
+                  '<p>' +
+                  esc(event.text) +
+                  '</p>'
+              )
+              .join('') +
+
+            (day.note
+              ? '<p><strong>Nota:</strong> ' +
+                esc(day.note) +
+                '</p>'
+              : '') +
+            '</article>'
+        )
+        .join('') +
+
+      '<h2>Distancias guardadas</h2>' +
+      '<table><thead><tr><th>Tramo</th><th>Distancia</th><th>Referencia</th></tr></thead><tbody>' +
+
+      D.routes
+        .map(
+          route =>
+            '<tr><td>' +
+            esc(route.title) +
+            '</td><td>' +
+            kmText(route.km) +
+            '</td><td>' +
+            esc(route.source) +
+            '</td></tr>'
+        )
+        .join('') +
+
+      '</tbody></table>' +
+      '<p>Distancias orientativas. Mpuzi y Machinho: ubicación exacta pendiente. Litlatla: referencia de la aldea; centro de salud pendiente. Regreso y pernocta del jueves por confirmar.</p>';
+  }
+
+  let offlineReady = false;
+  let swRegistration = null;
+  let registrationPromise = null;
+  let saving = false;
+
+  function updateConnection() {
+    const status = $('connection-status');
+
+    if (status) {
+      const label = navigator.onLine
+        ? offlineReady
+          ? 'Copia disponible sin conexión'
+          : 'Con conexión'
+        : 'Sin conexión';
+
+      status.textContent = label;
+      status.classList.toggle(
+        'is-offline',
+        !navigator.onLine
+      );
+    }
+
+    if (baseMode !== 'offline') {
+      changeBase();
+    }
+  }
+
+  function swMessage(worker, type) {
+    return new Promise((resolve, reject) => {
+      if (!worker) {
+        reject(
+          new Error(
+            'El guardado todavía no está preparado.'
+          )
+        );
+        return;
+      }
+
+      const channel = new MessageChannel();
+
+      const timer = setTimeout(() => {
+        channel.port1.close();
+
+        reject(
+          new Error(
+            'No se ha podido comprobar el guardado. Vuelve a intentarlo con conexión.'
+          )
+        );
+      }, 30000);
+
+      channel.port1.onmessage = event => {
+        clearTimeout(timer);
+        channel.port1.close();
+
+        if (event.data.ok) {
+          resolve(event.data);
+        } else {
+          reject(
+            new Error(
+              event.data.error || 'Guardado incompleto.'
+            )
+          );
+        }
+      };
+
+      worker.postMessage(
+        {
+          type
+        },
+        [channel.port2]
+      );
+    });
+  }
+
+  function markReady(ready) {
+    offlineReady = ready;
+
+    $('offline-button-label').textContent = ready
+      ? 'Disponible sin conexión'
+      : 'Guardar sin conexión';
+
+    $('offline-detail').textContent = ready
+      ? 'La agenda, las distancias y el mapa básico están guardados en este navegador.'
+      : 'Todavía no se ha confirmado una copia completa.';
+
+    updateConnection();
+  }
+
   async function setupOffline() {
-    if(registrationPromise)return registrationPromise;
-    registrationPromise=(async()=>{
-      if(!('serviceWorker' in navigator)||!window.isSecureContext||location.protocol==='file:')throw new Error('Abre la web publicada en GitHub Pages para guardarla en el móvil. Los archivos descargados conservan sus datos localmente.');
-      swRegistration=await navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'});
-      const ready=await Promise.race([navigator.serviceWorker.ready,new Promise((_,reject)=>setTimeout(()=>reject(new Error('El guardado no ha finalizado. Revisa la conexión y vuelve a intentarlo.')),30000))]);
-      swRegistration=ready;
-      const status=await swMessage(ready.active,'OFFLINE_STATUS');markReady(Boolean(status.ready));
+    if (registrationPromise) {
+      return registrationPromise;
+    }
+
+    registrationPromise = (async () => {
+      if (
+        !('serviceWorker' in navigator) ||
+        !window.isSecureContext ||
+        location.protocol === 'file:'
+      ) {
+        throw new Error(
+          'Abre la web publicada en GitHub Pages para guardarla en el móvil. Los archivos descargados conservan sus datos localmente.'
+        );
+      }
+
+      swRegistration = await navigator.serviceWorker.register(
+        './sw.js',
+        {
+          scope: './',
+          updateViaCache: 'none'
+        }
+      );
+
+      const ready = await Promise.race([
+        navigator.serviceWorker.ready,
+
+        new Promise((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  'El guardado no ha finalizado. Revisa la conexión y vuelve a intentarlo.'
+                )
+              ),
+            30000
+          )
+        )
+      ]);
+
+      swRegistration = ready;
+
+      const status = await swMessage(
+        ready.active,
+        'OFFLINE_STATUS'
+      );
+
+      markReady(Boolean(status.ready));
+
       return ready;
-    })().catch(error=>{registrationPromise=null;throw error;});
+    })().catch(error => {
+      registrationPromise = null;
+      throw error;
+    });
+
     return registrationPromise;
   }
+
   async function saveOffline() {
-    if(offlineReady){$('offline-dialog').showModal();return;}
-    if(saving)return;
-    saving=true;$('offline-button').disabled=true;$('offline-button-label').textContent='Guardando…';
+    if (offlineReady) {
+      $('offline-dialog').showModal();
+      return;
+    }
+
+    if (saving) return;
+
+    saving = true;
+    $('offline-button').disabled = true;
+    $('offline-button-label').textContent = 'Guardando…';
+
     try {
-      const registration=await setupOffline();
-      const result=await swMessage(registration.active,'SAVE_OFFLINE');
-      if(!result.ready)throw new Error('Faltan archivos por guardar. Inténtalo de nuevo con conexión.');
-      markReady(true);toast('Guía guardada. Agenda, distancias y mapa básico disponibles sin conexión.');
-    } catch(error) {markReady(false);$('offline-detail').textContent=error.message;toast(error.message);}
-    finally {saving=false;$('offline-button').disabled=false;}
+      const registration = await setupOffline();
+
+      const result = await swMessage(
+        registration.active,
+        'SAVE_OFFLINE'
+      );
+
+      if (!result.ready) {
+        throw new Error(
+          'Faltan archivos por guardar. Inténtalo de nuevo con conexión.'
+        );
+      }
+
+      markReady(true);
+
+      toast(
+        'Guía guardada. Agenda, distancias y mapa básico disponibles sin conexión.'
+      );
+    } catch (error) {
+      markReady(false);
+      $('offline-detail').textContent = error.message;
+      toast(error.message);
+    } finally {
+      saving = false;
+      $('offline-button').disabled = false;
+    }
   }
-  document.addEventListener('click',event=>{
-    const button=event.target.closest('button, a');if(!button)return;
-    if(button.dataset.day!==undefined){selectDay(button.dataset.day);return;}
-    if(button.dataset.step){selectDay(Number(currentDay)+Number(button.dataset.step));return;}
-    if(button.dataset.panel){showPanel(button.dataset.panel);return;}
-    if(button.dataset.mobile){setMobileView(button.dataset.mobile);return;}
-    if(button.dataset.place){focusPlace(button.dataset.place);return;}
-    if(button.dataset.distance){const r=routesById[button.dataset.distance];$('distance-from').value=r.from;$('distance-to').value=r.to;calculateDistance(true);return;}
-    if(button.dataset.openDistances){if(smallScreen())setMobileView('distances');else showPanel('distances');return;}
-    if(button.dataset.viewAgenda){setMobileView('agenda');return;}
-    if(button.dataset.online&&!navigator.onLine){event.preventDefault();toast('Este enlace necesita internet. La información de la visita y las distancias siguen disponibles aquí.');}
+
+  document.addEventListener('click', event => {
+    const button = event.target.closest('button, a');
+
+    if (!button) return;
+
+    if (button.dataset.day !== undefined) {
+      selectDay(button.dataset.day);
+      return;
+    }
+
+    if (button.dataset.step) {
+      selectDay(
+        Number(currentDay) + Number(button.dataset.step)
+      );
+      return;
+    }
+
+    if (button.dataset.panel) {
+      showPanel(button.dataset.panel);
+      return;
+    }
+
+    if (button.dataset.mobile) {
+      setMobileView(button.dataset.mobile);
+      return;
+    }
+
+    if (button.dataset.place) {
+      focusPlace(button.dataset.place);
+      return;
+    }
+
+    if (button.dataset.distance) {
+      const route = routesById[button.dataset.distance];
+
+      $('distance-from').value = route.from;
+      $('distance-to').value = route.to;
+
+      calculateDistance(true);
+      return;
+    }
+
+    if (button.dataset.openDistances) {
+      if (smallScreen()) {
+        setMobileView('distances');
+      } else {
+        showPanel('distances');
+      }
+
+      return;
+    }
+
+    if (button.dataset.viewAgenda) {
+      setMobileView('agenda');
+      return;
+    }
+
+    if (
+      button.dataset.online &&
+      !navigator.onLine
+    ) {
+      event.preventDefault();
+
+      toast(
+        'Este enlace necesita internet. La información de la visita y las distancias siguen disponibles aquí.'
+      );
+    }
   });
-  document.querySelector('.panel-tabs').addEventListener('keydown',event=>{
-    if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
-    const names=['agenda','distances','places'];let index=names.indexOf(currentPanel);
-    index=event.key==='Home'?0:event.key==='End'?2:(index+(event.key==='ArrowRight'?1:2))%3;
-    event.preventDefault();showPanel(names[index]);$('tab-'+names[index]).focus();
+
+  document
+    .querySelector('.panel-tabs')
+    .addEventListener('keydown', event => {
+      if (
+        ![
+          'ArrowLeft',
+          'ArrowRight',
+          'Home',
+          'End'
+        ].includes(event.key)
+      ) {
+        return;
+      }
+
+      const names = [
+        'agenda',
+        'distances',
+        'places'
+      ];
+
+      let index = names.indexOf(currentPanel);
+
+      index =
+        event.key === 'Home'
+          ? 0
+          : event.key === 'End'
+            ? 2
+            : (index +
+                (event.key === 'ArrowRight' ? 1 : 2)) %
+              3;
+
+      event.preventDefault();
+
+      showPanel(names[index]);
+      $('tab-' + names[index]).focus();
+    });
+
+  $('distance-form').addEventListener(
+    'submit',
+    event => {
+      event.preventDefault();
+      calculateDistance(false);
+    }
+  );
+
+  $('distance-result').addEventListener(
+    'click',
+    event => {
+      if (
+        event.target.closest('#show-distance-route')
+      ) {
+        showDistanceMap();
+      }
+    }
+  );
+
+  $('swap-places').addEventListener(
+    'click',
+    () => {
+      const first = $('distance-from').value;
+
+      $('distance-from').value =
+        $('distance-to').value;
+
+      $('distance-to').value = first;
+
+      calculateDistance(false);
+    }
+  );
+
+  $('distance-from').addEventListener(
+    'change',
+    () => calculateDistance(false)
+  );
+
+  $('distance-to').addEventListener(
+    'change',
+    () => calculateDistance(false)
+  );
+
+  $('fit-map').addEventListener('click', () => {
+    routeHighlight = null;
+    renderMap(true);
   });
-  $('distance-form').addEventListener('submit',event=>{event.preventDefault();calculateDistance(false);});
-  $('distance-result').addEventListener('click',event=>{if(event.target.closest('#show-distance-route'))showDistanceMap();});
-  $('swap-places').addEventListener('click',()=>{const a=$('distance-from').value;$('distance-from').value=$('distance-to').value;$('distance-to').value=a;calculateDistance(false);});
-  $('distance-from').addEventListener('change',()=>calculateDistance(false));$('distance-to').addEventListener('change',()=>calculateDistance(false));
-  $('fit-map').addEventListener('click',()=>{routeHighlight=null;renderMap(true);});
-  $('zoom-in').addEventListener('click',()=>map&&map.zoomIn());$('zoom-out').addEventListener('click',()=>map&&map.zoomOut());
-  $('locate-button').addEventListener('click',locate);$('play-journey').addEventListener('click',play);
-  $('base-offline').addEventListener('click',()=>changeBase('offline'));$('base-streets').addEventListener('click',()=>changeBase('streets'));
-  $('offline-button').addEventListener('click',saveOffline);$('help-button').addEventListener('click',()=>$('offline-dialog').showModal());$('close-dialog').addEventListener('click',()=>$('offline-dialog').close());
-  $('print-button').addEventListener('click',()=>{renderPrint();window.print();});
-  window.addEventListener('beforeprint',renderPrint);window.addEventListener('hashchange',()=>selectDay(dayFromHash(location.hash),{history:false}));
-  window.addEventListener('offline',updateConnection);window.addEventListener('online',()=>{updateConnection();setupOffline().catch(()=>{});});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPlay();});
-  initMap();renderTabs();renderAgenda();renderPlaces();renderMobileSummary();renderDistances();routeHighlight=null;renderMap(true);renderPrint();updateConnection();
-  setupOffline().catch(error=>{$('offline-detail').textContent=error.message;});
-  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('controllerchange',()=>{registrationPromise=null;setupOffline().catch(()=>{});});
+
+  $('zoom-in').addEventListener(
+    'click',
+    () => map && map.zoomIn()
+  );
+
+  $('zoom-out').addEventListener(
+    'click',
+    () => map && map.zoomOut()
+  );
+
+  $('locate-button').addEventListener(
+    'click',
+    locate
+  );
+
+  $('play-journey').addEventListener(
+    'click',
+    play
+  );
+
+  const offlineBaseButton = $('base-offline');
+
+  if (offlineBaseButton) {
+    offlineBaseButton.addEventListener(
+      'click',
+      () => changeBase()
+    );
+  }
+
+  $('offline-button').addEventListener(
+    'click',
+    saveOffline
+  );
+
+  $('help-button').addEventListener(
+    'click',
+    () => $('offline-dialog').showModal()
+  );
+
+  $('close-dialog').addEventListener(
+    'click',
+    () => $('offline-dialog').close()
+  );
+
+  $('print-button').addEventListener(
+    'click',
+    () => {
+      renderPrint();
+      window.print();
+    }
+  );
+
+  window.addEventListener(
+    'beforeprint',
+    renderPrint
+  );
+
+  window.addEventListener(
+    'hashchange',
+    () =>
+      selectDay(
+        dayFromHash(location.hash),
+        {
+          history: false
+        }
+      )
+  );
+
+  window.addEventListener(
+    'offline',
+    updateConnection
+  );
+
+  window.addEventListener(
+    'online',
+    () => {
+      updateConnection();
+      setupOffline().catch(() => {});
+    }
+  );
+
+  document.addEventListener(
+    'visibilitychange',
+    () => {
+      if (document.hidden) {
+        stopPlay();
+      }
+    }
+  );
+
+  initMap();
+  renderTabs();
+  renderAgenda();
+  renderPlaces();
+  renderMobileSummary();
+  renderDistances();
+
+  routeHighlight = null;
+
+  renderMap(true);
+  renderPrint();
+  updateConnection();
+
+  setupOffline().catch(error => {
+    $('offline-detail').textContent = error.message;
+  });
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener(
+      'controllerchange',
+      () => {
+        registrationPromise = null;
+        setupOffline().catch(() => {});
+      }
+    );
+  }
 })();
